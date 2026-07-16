@@ -15,18 +15,22 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2)
 
-# cfr_game / cfr_eval are header-only (INTERFACE) at M0 — no .cpp sources exist
-# yet. Kuhn/Leduc (T3/T4) and the evaluator (T5/T6) add real sources; those
-# tasks switch these to STATIC libraries with explicit source lists.
-add_library(cfr_game INTERFACE)
-target_include_directories(cfr_game INTERFACE ${CMAKE_SOURCE_DIR}/src)
+# cfr_game is a STATIC library now that Kuhn/Leduc (T3/T4) provide real
+# sources. cfr_eval stays header-only (INTERFACE) until the evaluator (T5/T6)
+# lands its own sources.
+add_library(cfr_game STATIC
+    src/game/kuhn.cpp
+)
+target_include_directories(cfr_game PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 add_library(cfr_eval INTERFACE)
 target_include_directories(cfr_eval INTERFACE ${CMAKE_SOURCE_DIR}/src)
 
 add_executable(cfr_tests
     tests/test_card.cpp
+    tests/test_kuhn.cpp
 )
+target_include_directories(cfr_tests PRIVATE ${CMAKE_SOURCE_DIR}/tests)
 target_link_libraries(cfr_tests PRIVATE cfr_game cfr_eval Catch2::Catch2WithMain)
 
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
