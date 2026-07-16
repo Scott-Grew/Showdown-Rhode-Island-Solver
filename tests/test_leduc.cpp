@@ -34,23 +34,39 @@ TEST_CASE("leduc: infoset count is measured and stable") {  // V8-equivalent for
 }
 
 TEST_CASE("leduc: infoset key hides opponent card") {        // V2
-    // group by (current_player, own card, public card, betting actions only —
-    // chance-deal entries stripped out so the opponent's card never enters
-    // the group key). The only thing that can still differ within a group is
-    // the opponent's private card, so V2 requires exactly one key per group.
+    // group by (current_player, own card, public card, round1 betting actions,
+    // round2 betting actions — kept separate, mirroring infoset_key's own
+    // round1:round2 structure, so a round-boundary difference can never be
+    // mistaken for a round-internal one). Chance-deal entries are stripped out
+    // so the opponent's card never enters the group key. The only thing that
+    // can still differ within a group is the opponent's private card, so V2
+    // requires exactly one key per group.
     LeducGame game;
-    std::map<std::tuple<int, int, int, std::vector<Action>>, std::set<InfoSetKey>> keys_by_group;
+    std::map<std::tuple<int, int, int, std::vector<Action>, std::vector<Action>>, std::set<InfoSetKey>>
+        keys_by_group;
 
     walk(game, game.initial_state(), [&](const State& s) {
         if (game.is_terminal(s) || game.is_chance(s)) return;
         int player = game.current_player(s);
         int own_card = s.private_cards[player];
         int public_card = s.public_cards.empty() ? -1 : s.public_cards[0];
-        std::vector<Action> betting_actions;
+
+        std::vector<Action> round1_betting_actions;
+        std::vector<Action> round2_betting_actions;
+        int chance_events_seen = 0;
         for (Action entry : s.history) {
-            if (entry < kChanceCardOffset) betting_actions.push_back(entry);
+            if (entry >= kChanceCardOffset) {
+                ++chance_events_seen;
+                continue;
+            }
+            if (chance_events_seen < 3) {
+                round1_betting_actions.push_back(entry);
+            } else {
+                round2_betting_actions.push_back(entry);
+            }
         }
-        keys_by_group[{player, own_card, public_card, betting_actions}].insert(game.infoset_key(s));
+        keys_by_group[{player, own_card, public_card, round1_betting_actions, round2_betting_actions}]
+            .insert(game.infoset_key(s));
     });
 
     for (auto& [group, keys] : keys_by_group) {

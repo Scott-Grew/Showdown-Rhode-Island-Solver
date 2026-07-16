@@ -137,7 +137,7 @@ bool LeducGame::is_chance(const State& state) const {
     if (state.private_cards[0] == -1 || state.private_cards[1] == -1) return true;
     ParsedHistory parsed = parse_history(state);
     if (parsed.public_card_dealt) return false;
-    return round_closed(parsed.round1_actions) && !folded(parsed.round1_actions);
+    return round_closed(parsed.round1_actions);
 }
 
 bool LeducGame::is_terminal(const State& state) const {
