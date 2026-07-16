@@ -7,6 +7,16 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_compile_options(-Wall -Wextra -Werror)
 
+# eval7's batch path takes an AVX2 fast path when the compiler can target it
+# (Intel Mac, most x86-64 CI runners); it falls back to unrolled scalar code
+# otherwise (see src/eval/eval7.cpp). Detected rather than assumed so a
+# non-x86 build never gets a hard compile failure over it.
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-mavx2 CFR_HAS_AVX2_FLAG)
+if(CFR_HAS_AVX2_FLAG)
+    add_compile_options(-mavx2)
+endif()
+
 include(FetchContent)
 FetchContent_Declare(
     Catch2
@@ -25,6 +35,7 @@ target_include_directories(cfr_game PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 add_library(cfr_eval STATIC
     src/eval/eval5.cpp
+    src/eval/eval7.cpp
 )
 target_include_directories(cfr_eval PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
@@ -41,6 +52,7 @@ add_executable(cfr_tests
     tests/test_kuhn.cpp
     tests/test_leduc.cpp
     tests/test_eval5.cpp
+    tests/test_eval7.cpp
 )
 target_include_directories(cfr_tests PRIVATE ${CMAKE_SOURCE_DIR}/tests)
 target_link_libraries(cfr_tests PRIVATE cfr_game cfr_eval cfr_eval_naive_ref Catch2::Catch2WithMain)
