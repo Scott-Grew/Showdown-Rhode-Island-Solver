@@ -4,7 +4,7 @@
 #include <array>
 #include <cstddef>
 
-#if defined(__AVX2__)
+#if defined(__AVX2__) && !defined(CFR_FORCE_SCALAR_BATCH)
 #include <immintrin.h>
 #endif
 
@@ -37,7 +37,7 @@ HandRank evaluate_7card(const Card* cards) {
     return best;
 }
 
-#if defined(__AVX2__)
+#if defined(__AVX2__) && !defined(CFR_FORCE_SCALAR_BATCH)
 
 // evaluate_7card's per-hand work is a branchy bitmask/histogram computation
 // with no natural data-parallel structure across hands (each hand's control
