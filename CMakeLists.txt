@@ -72,8 +72,8 @@ include(CTest)
 include(Catch)
 catch_discover_tests(cfr_tests)
 
-# cfr_bench: no bench sources exist until T7 — gate the target behind their
-# existence rather than shipping a placeholder main.
+# cfr_bench: gated on bench/bench_eval.cpp existing (T7 landed it) rather
+# than shipping a placeholder main for the gap before that.
 if(EXISTS ${CMAKE_SOURCE_DIR}/bench/bench_eval.cpp)
     add_executable(cfr_bench bench/bench_eval.cpp)
     target_link_libraries(cfr_bench PRIVATE cfr_game cfr_eval)
