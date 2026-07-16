@@ -25,7 +25,7 @@ add_library(cfr_eval INTERFACE)
 target_include_directories(cfr_eval INTERFACE ${CMAKE_SOURCE_DIR}/src)
 
 add_executable(cfr_tests
-    tests/test_sanity.cpp
+    tests/test_card.cpp
 )
 target_link_libraries(cfr_tests PRIVATE cfr_game cfr_eval Catch2::Catch2WithMain)
 
