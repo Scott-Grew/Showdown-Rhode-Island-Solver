@@ -1,0 +1,17 @@
+# Inert until this repo gets a remote — no trigger wired to a live GitHub repo yet.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: make test
+        run: make test
