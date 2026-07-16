@@ -97,10 +97,15 @@ int main() {
     std::vector<Card> hands = generate_hand_buffer();
     std::vector<HandRank> ranks(kHandCount);
 
-    // (1) scalar evaluate_7card, called once per hand.
+    // (1) scalar evaluate_7card, called once per hand. The checksum XOR-folds
+    // ranks[hand_index] as it's produced -- a single XOR per hand, inside the
+    // timed region, so the compiler can't prove the loop's results go unused
+    // and DCE the whole thing out from under the timer.
+    std::uint64_t scalar_checksum = 0;
     auto scalar_start = std::chrono::steady_clock::now();
     for (std::size_t hand_index = 0; hand_index < kHandCount; ++hand_index) {
         ranks[hand_index] = evaluate_7card(hands.data() + hand_index * kCardsPerHand);
+        scalar_checksum ^= ranks[hand_index];
     }
     auto scalar_elapsed = std::chrono::steady_clock::now() - scalar_start;
 
@@ -109,8 +114,18 @@ int main() {
     evaluate_7card_batch(hands.data(), kHandCount, ranks.data());
     auto batch_elapsed = std::chrono::steady_clock::now() - batch_start;
 
+    // Batch's timed region is the single call above; folding its output into
+    // a checksum happens after batch_elapsed is captured, so it can't distort
+    // the timing window, but still forces the compiler to keep the writes.
+    std::uint64_t batch_checksum = 0;
+    for (std::size_t hand_index = 0; hand_index < kHandCount; ++hand_index) {
+        batch_checksum ^= ranks[hand_index];
+    }
+
     std::printf("hands evaluated: %zu\n", kHandCount);
-    std::printf("scalar evaluate_7card: %.0f hands/sec\n", hands_per_second(kHandCount, scalar_elapsed));
-    std::printf("evaluate_7card_batch:  %.0f hands/sec\n", hands_per_second(kHandCount, batch_elapsed));
+    std::printf("scalar evaluate_7card: %.0f hands/sec (checksum: 0x%016llx)\n",
+                 hands_per_second(kHandCount, scalar_elapsed), static_cast<unsigned long long>(scalar_checksum));
+    std::printf("evaluate_7card_batch:  %.0f hands/sec (checksum: 0x%016llx)\n",
+                 hands_per_second(kHandCount, batch_elapsed), static_cast<unsigned long long>(batch_checksum));
     return 0;
 }
