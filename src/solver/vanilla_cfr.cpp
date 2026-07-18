@@ -37,8 +37,16 @@ std::array<double, 2> VanillaCfr::traverse(const game::State& state, double play
     game::InfoSetKey key = game_.infoset_key(state);
     std::vector<game::Action> actions = game_.legal_actions(state);
 
-    auto& cumulative_regrets = cumulative_regrets_.try_emplace(key, actions.size(), 0.0).first->second;
-    std::vector<double> strategy = regret_matching_strategy(cumulative_regrets);
+    // sigma^t for this infoset: regret-matched against the iteration-start
+    // snapshot, not the live (possibly already-updated-this-iteration) table
+    // -- see class docblock. A key missing from the snapshot (first-ever
+    // visit to this infoset) gets the all-zero regret vector, which
+    // regret_matching_strategy resolves to uniform, same as the live
+    // table's own missing-key behavior.
+    auto snapshot_entry = regret_snapshot_.find(key);
+    std::vector<double> strategy = snapshot_entry != regret_snapshot_.end()
+                                        ? regret_matching_strategy(snapshot_entry->second)
+                                        : regret_matching_strategy(std::vector<double>(actions.size(), 0.0));
 
     double acting_player_reach = acting_player == 0 ? player0_reach : player1_reach;
     auto& strategy_sum = strategy_sums_.try_emplace(key, actions.size(), 0.0).first->second;
@@ -58,6 +66,10 @@ std::array<double, 2> VanillaCfr::traverse(const game::State& state, double play
         acting_player_action_value[i] = child_value[acting_player];
     }
 
+    // Increments go to the live table, never the snapshot -- the snapshot
+    // stays frozen at its iteration-start values for the rest of this
+    // traversal (see class docblock).
+    auto& cumulative_regrets = cumulative_regrets_.try_emplace(key, actions.size(), 0.0).first->second;
     double opponent_reach = acting_player == 0 ? player1_reach : player0_reach;
     double counterfactual_reach = opponent_reach * chance_reach;
     for (std::size_t i = 0; i < actions.size(); ++i) {
@@ -70,6 +82,7 @@ std::array<double, 2> VanillaCfr::traverse(const game::State& state, double play
 
 void VanillaCfr::run_iterations(int iteration_count) {
     for (int i = 0; i < iteration_count; ++i) {
+        regret_snapshot_ = cumulative_regrets_;
         traverse(game_.initial_state(), 1.0, 1.0, 1.0);
     }
 }
