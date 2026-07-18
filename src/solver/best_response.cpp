@@ -22,6 +22,28 @@ using StatesByInfoset = std::map<game::InfoSetKey, std::vector<std::pair<game::S
 // own value -- the recursion always terminates.
 using BestResponseMemo = std::map<game::InfoSetKey, double>;
 
+// Opponent's fixed action-probability distribution at `state`, indexed in
+// `actions` (== game.legal_actions(state)) order. An infoset absent from
+// opponent_strategy falls back to uniform (documented in best_response.hpp)
+// so best response stays defined against partial profiles. Shared by both
+// tree walks below -- collect_responder_states weights reach by these
+// probabilities, node_value takes their expectation -- since both resolve
+// the opponent's node the same way.
+std::vector<double> opponent_action_probabilities(const game::Game& game, const game::State& state,
+                                                    const StrategyProfile& opponent_strategy,
+                                                    const std::vector<game::Action>& actions) {
+    auto profile_entry = opponent_strategy.find(game.infoset_key(state));
+    // Cross-module contract: states sharing an infoset key must yield
+    // same-length, same-order action lists (game.legal_actions is a
+    // function of the infoset, not the full state) -- StrategyProfile
+    // entries are indexed on that assumption.
+    if (profile_entry != opponent_strategy.end()) {
+        assert(profile_entry->second.size() == actions.size());
+        return profile_entry->second;
+    }
+    return std::vector<double>(actions.size(), 1.0 / static_cast<double>(actions.size()));
+}
+
 // Below this total reach weight, an infoset is treated as unreached under
 // the opponent's and chance's actual behavior (e.g. an opponent strategy
 // that assigns a literal 0.0 to every action leading there). Its value is
@@ -59,23 +81,12 @@ void collect_responder_states(const game::Game& game, const game::State& state, 
         return;
     }
 
-    // Opponent's node: expectation under their fixed strategy. An infoset
-    // missing from the profile falls back to uniform (documented in the
-    // header) so best response stays defined against partial profiles.
-    auto profile_entry = opponent_strategy.find(game.infoset_key(state));
-    // Cross-module contract: states sharing an infoset key must yield
-    // same-length, same-order action lists (game.legal_actions is a
-    // function of the infoset, not the full state) -- StrategyProfile
-    // entries are indexed on that assumption.
-    if (profile_entry != opponent_strategy.end()) {
-        assert(profile_entry->second.size() == actions.size());
-    }
-    double uniform_probability = 1.0 / static_cast<double>(actions.size());
+    // Opponent's node: expectation under their fixed strategy.
+    std::vector<double> action_probabilities = opponent_action_probabilities(game, state, opponent_strategy, actions);
     for (std::size_t i = 0; i < actions.size(); ++i) {
-        double action_probability =
-            profile_entry != opponent_strategy.end() ? profile_entry->second[i] : uniform_probability;
-        collect_responder_states(game, game.apply_action(state, actions[i]), reach_weight * action_probability,
-                                  opponent_strategy, responder, states_by_infoset);
+        collect_responder_states(game, game.apply_action(state, actions[i]),
+                                  reach_weight * action_probabilities[i], opponent_strategy, responder,
+                                  states_by_infoset);
     }
 }
 
@@ -143,18 +154,13 @@ double node_value(const game::Game& game, const game::State& state, const Strate
     }
 
     std::vector<game::Action> actions = game.legal_actions(state);
-    auto profile_entry = opponent_strategy.find(game.infoset_key(state));
-    if (profile_entry != opponent_strategy.end()) {
-        assert(profile_entry->second.size() == actions.size());
-    }
-    double uniform_probability = 1.0 / static_cast<double>(actions.size());
+    std::vector<double> action_probabilities = opponent_action_probabilities(game, state, opponent_strategy, actions);
 
     double expected_value = 0.0;
     for (std::size_t i = 0; i < actions.size(); ++i) {
-        double action_probability =
-            profile_entry != opponent_strategy.end() ? profile_entry->second[i] : uniform_probability;
-        expected_value += action_probability * node_value(game, game.apply_action(state, actions[i]),
-                                                            opponent_strategy, responder, states_by_infoset, memo);
+        expected_value += action_probabilities[i] * node_value(game, game.apply_action(state, actions[i]),
+                                                                 opponent_strategy, responder, states_by_infoset,
+                                                                 memo);
     }
     return expected_value;
 }
