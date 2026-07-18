@@ -29,6 +29,7 @@ TEST_CASE("regret matching: output sums to 1") {                    // V10
         {-1.0, -2.0, -3.0},
         {2.0, -1.0, 4.0, 0.0},
         {0.0, 3.0},
+        {4.0},
     };
     for (const auto& cumulative_regrets : regret_vectors) {
         auto strategy = regret_matching_strategy(cumulative_regrets);

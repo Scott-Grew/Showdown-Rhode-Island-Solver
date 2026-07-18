@@ -60,6 +60,7 @@ target_include_directories(cfr_eval_naive_ref PUBLIC ${CMAKE_SOURCE_DIR}/src)
 add_library(cfr_solver STATIC
     src/solver/strategy.cpp
     src/solver/best_response.cpp
+    src/solver/vanilla_cfr.cpp
 )
 target_include_directories(cfr_solver PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(cfr_solver PUBLIC cfr_game)
@@ -72,6 +73,7 @@ add_executable(cfr_tests
     tests/test_eval7.cpp
     tests/test_regret_matching.cpp
     tests/test_best_response.cpp
+    tests/test_cfr_kuhn.cpp
 )
 target_include_directories(cfr_tests PRIVATE ${CMAKE_SOURCE_DIR}/tests)
 target_link_libraries(cfr_tests PRIVATE cfr_game cfr_eval cfr_eval_naive_ref cfr_solver Catch2::Catch2WithMain)
