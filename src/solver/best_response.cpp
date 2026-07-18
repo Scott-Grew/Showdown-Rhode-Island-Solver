@@ -1,6 +1,7 @@
 #include "solver/best_response.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <limits>
 
@@ -8,8 +9,121 @@ namespace cfr::solver {
 
 namespace {
 
-double best_response_recursive(const game::Game& game, const game::State& state,
-                                const StrategyProfile& opponent_strategy, game::Player responder) {
+// Every game-tree node where `responder` is to act, grouped by infoset
+// key, each tagged with its reach weight: the probability of reaching
+// that exact node under chance's and the *opponent's* fixed strategy
+// alone. See best_response.hpp for why the responder's own action
+// probabilities are deliberately excluded from this weight.
+using StatesByInfoset = std::map<game::InfoSetKey, std::vector<std::pair<game::State, double>>>;
+
+// Per-infoset best-response value, filled in lazily by best_response_value_at
+// as node_value's recursion discovers it needs one. Betting histories only
+// ever grow, so an infoset can never (directly or indirectly) depend on its
+// own value -- the recursion always terminates.
+using BestResponseMemo = std::map<game::InfoSetKey, double>;
+
+// Below this total reach weight, an infoset is treated as unreached under
+// the opponent's and chance's actual behavior (e.g. an opponent strategy
+// that assigns a literal 0.0 to every action leading there). Its value is
+// then irrelevant -- every caller that could reach it multiplies by that
+// same ~0 weight -- but 0/total_reach_weight would still be a 0/0 NaN that
+// poisons the sum upward, so it gets an arbitrary safe placeholder instead.
+constexpr double kUnreachableInfosetWeightEpsilon = 1e-12;
+
+// Branches into every one of the responder's own actions unconditionally
+// (which one is optimal isn't known yet -- best_response_value_at resolves
+// that afterward, once every occurrence of an infoset has been collected).
+// At the opponent's and chance's nodes it simply follows their probabilities,
+// same as a plain expectation walk.
+void collect_responder_states(const game::Game& game, const game::State& state, double reach_weight,
+                               const StrategyProfile& opponent_strategy, game::Player responder,
+                               StatesByInfoset& states_by_infoset) {
+    if (game.is_terminal(state)) return;
+
+    if (game.is_chance(state)) {
+        for (auto& [action, probability] : game.chance_outcomes(state)) {
+            collect_responder_states(game, game.apply_action(state, action), reach_weight * probability,
+                                      opponent_strategy, responder, states_by_infoset);
+        }
+        return;
+    }
+
+    std::vector<game::Action> actions = game.legal_actions(state);
+
+    if (game.current_player(state) == responder) {
+        states_by_infoset[game.infoset_key(state)].emplace_back(state, reach_weight);
+        for (game::Action action : actions) {
+            collect_responder_states(game, game.apply_action(state, action), reach_weight, opponent_strategy,
+                                      responder, states_by_infoset);
+        }
+        return;
+    }
+
+    // Opponent's node: expectation under their fixed strategy. An infoset
+    // missing from the profile falls back to uniform (documented in the
+    // header) so best response stays defined against partial profiles.
+    auto profile_entry = opponent_strategy.find(game.infoset_key(state));
+    // Cross-module contract: states sharing an infoset key must yield
+    // same-length, same-order action lists (game.legal_actions is a
+    // function of the infoset, not the full state) -- StrategyProfile
+    // entries are indexed on that assumption.
+    if (profile_entry != opponent_strategy.end()) {
+        assert(profile_entry->second.size() == actions.size());
+    }
+    double uniform_probability = 1.0 / static_cast<double>(actions.size());
+    for (std::size_t i = 0; i < actions.size(); ++i) {
+        double action_probability =
+            profile_entry != opponent_strategy.end() ? profile_entry->second[i] : uniform_probability;
+        collect_responder_states(game, game.apply_action(state, actions[i]), reach_weight * action_probability,
+                                  opponent_strategy, responder, states_by_infoset);
+    }
+}
+
+double node_value(const game::Game& game, const game::State& state, const StrategyProfile& opponent_strategy,
+                   game::Player responder, const StatesByInfoset& states_by_infoset, BestResponseMemo& memo);
+
+// Resolves one responder infoset: the reach-weighted average, across every
+// node sharing infoset_key, of the continuation value for each candidate
+// action -- maximized once, memoized, and reused everywhere that infoset
+// recurs. This is what keeps the responder's decision consistent across
+// every node that shares the infoset, rather than (wrongly) re-optimizing
+// per tree node.
+//
+// The result is normalized (divided by the infoset's total reach weight)
+// rather than left as the raw weighted sum: node_value's callers -- chance
+// and opponent nodes -- each multiply whatever this returns by their own
+// local branch probability on the way back up, exactly as they do for any
+// other child. An unnormalized sum would get that reach weight counted
+// twice: once baked into the sum here, once again by every ancestor branch
+// that calls into this same infoset.
+double best_response_value_at(const game::Game& game, const game::InfoSetKey& infoset_key,
+                               const StrategyProfile& opponent_strategy, game::Player responder,
+                               const StatesByInfoset& states_by_infoset, BestResponseMemo& memo) {
+    auto memo_entry = memo.find(infoset_key);
+    if (memo_entry != memo.end()) return memo_entry->second;
+
+    const std::vector<std::pair<game::State, double>>& weighted_states = states_by_infoset.at(infoset_key);
+    std::vector<game::Action> actions = game.legal_actions(weighted_states.front().first);
+    std::vector<double> action_totals(actions.size(), 0.0);
+    double total_reach_weight = 0.0;
+
+    for (auto& [state, reach_weight] : weighted_states) {
+        total_reach_weight += reach_weight;
+        for (std::size_t i = 0; i < actions.size(); ++i) {
+            action_totals[i] += reach_weight * node_value(game, game.apply_action(state, actions[i]),
+                                                            opponent_strategy, responder, states_by_infoset, memo);
+        }
+    }
+
+    double best_value = *std::max_element(action_totals.begin(), action_totals.end());
+    double normalized_best_value =
+        total_reach_weight > kUnreachableInfosetWeightEpsilon ? best_value / total_reach_weight : 0.0;
+    memo[infoset_key] = normalized_best_value;
+    return normalized_best_value;
+}
+
+double node_value(const game::Game& game, const game::State& state, const StrategyProfile& opponent_strategy,
+                   game::Player responder, const StatesByInfoset& states_by_infoset, BestResponseMemo& memo) {
     if (game.is_terminal(state)) {
         return game.terminal_utility(state, responder);
     }
@@ -17,35 +131,30 @@ double best_response_recursive(const game::Game& game, const game::State& state,
     if (game.is_chance(state)) {
         double expected_value = 0.0;
         for (auto& [action, probability] : game.chance_outcomes(state)) {
-            expected_value += probability * best_response_recursive(game, game.apply_action(state, action),
-                                                                      opponent_strategy, responder);
+            expected_value += probability * node_value(game, game.apply_action(state, action), opponent_strategy,
+                                                         responder, states_by_infoset, memo);
         }
         return expected_value;
     }
 
-    std::vector<game::Action> actions = game.legal_actions(state);
-
     if (game.current_player(state) == responder) {
-        double best_value = -std::numeric_limits<double>::infinity();
-        for (game::Action action : actions) {
-            best_value = std::max(best_value, best_response_recursive(game, game.apply_action(state, action),
-                                                                        opponent_strategy, responder));
-        }
-        return best_value;
+        return best_response_value_at(game, game.infoset_key(state), opponent_strategy, responder, states_by_infoset,
+                                       memo);
     }
 
-    // Opponent's node: expectation under their fixed strategy. An infoset
-    // missing from the profile falls back to uniform (documented in the
-    // header) so best response stays defined against partial profiles.
+    std::vector<game::Action> actions = game.legal_actions(state);
     auto profile_entry = opponent_strategy.find(game.infoset_key(state));
+    if (profile_entry != opponent_strategy.end()) {
+        assert(profile_entry->second.size() == actions.size());
+    }
     double uniform_probability = 1.0 / static_cast<double>(actions.size());
 
     double expected_value = 0.0;
     for (std::size_t i = 0; i < actions.size(); ++i) {
         double action_probability =
             profile_entry != opponent_strategy.end() ? profile_entry->second[i] : uniform_probability;
-        expected_value += action_probability * best_response_recursive(game, game.apply_action(state, actions[i]),
-                                                                         opponent_strategy, responder);
+        expected_value += action_probability * node_value(game, game.apply_action(state, actions[i]),
+                                                            opponent_strategy, responder, states_by_infoset, memo);
     }
     return expected_value;
 }
@@ -54,7 +163,11 @@ double best_response_recursive(const game::Game& game, const game::State& state,
 
 double best_response_value(const game::Game& game, const StrategyProfile& opponent_strategy,
                             game::Player responder) {
-    return best_response_recursive(game, game.initial_state(), opponent_strategy, responder);
+    StatesByInfoset states_by_infoset;
+    collect_responder_states(game, game.initial_state(), 1.0, opponent_strategy, responder, states_by_infoset);
+
+    BestResponseMemo memo;
+    return node_value(game, game.initial_state(), opponent_strategy, responder, states_by_infoset, memo);
 }
 
 double exploitability(const game::Game& game, const StrategyProfile& profile) {
