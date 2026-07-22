@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <string>
 #include <vector>
 
 #include "game/game.hpp"
@@ -18,6 +19,9 @@ public:
     StrategyProfile current_strategy() const;
 
     int iterations_run() const;
+
+    void save_checkpoint(const std::string& path) const;
+    static CfrPlus load_checkpoint(const game::Game& game, const std::string& path);
 
 private:
 
