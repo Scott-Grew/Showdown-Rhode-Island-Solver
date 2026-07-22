@@ -24,7 +24,7 @@ TEST_CASE("V8: kuhn exactly 12 infosets") {
     std::set<InfoSetKey> keys;
     walk(game, game.initial_state(), [&](const State& s) {
         if (!game.is_terminal(s) && !game.is_chance(s))
-            keys.insert(game.infoset_key(s));
+            keys.insert(game.infoset_label(s));
     });
     REQUIRE(keys.size() == 12);
 }
@@ -39,7 +39,7 @@ TEST_CASE("V2: kuhn infoset key hides opponent card") {
         int player = game.current_player(s);
         int own_card = s.private_cards[player];
         std::vector<int> betting(s.history.begin() + 2, s.history.end());
-        keys_by_group[{player, own_card, betting}].insert(game.infoset_key(s));
+        keys_by_group[{player, own_card, betting}].insert(game.infoset_label(s));
     });
 
     for (auto& [group, keys] : keys_by_group) {

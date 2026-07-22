@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <map>
 #include <vector>
 
 #include "game/game.hpp"
@@ -24,9 +23,9 @@ private:
                                     double chance_reach);
 
     const game::Game& game_;
-    std::map<game::InfoSetKey, std::vector<double>> cumulative_regrets_;
-    std::map<game::InfoSetKey, std::vector<double>> regret_snapshot_;
-    std::map<game::InfoSetKey, std::vector<double>> strategy_sums_;
+    std::vector<std::vector<double>> cumulative_regrets_;
+    std::vector<std::vector<double>> regret_snapshot_;
+    std::vector<std::vector<double>> strategy_sums_;
 };
 
 }

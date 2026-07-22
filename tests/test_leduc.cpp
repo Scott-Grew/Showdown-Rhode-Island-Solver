@@ -26,7 +26,7 @@ TEST_CASE("V8: leduc infoset count is measured and stable") {
     std::set<InfoSetKey> keys;
     walk(game, game.initial_state(), [&](const State& s) {
         if (!game.is_terminal(s) && !game.is_chance(s))
-            keys.insert(game.infoset_key(s));
+            keys.insert(game.infoset_label(s));
     });
     CHECK(keys.size() == 288);
 }
@@ -58,7 +58,7 @@ TEST_CASE("V2: leduc infoset key hides opponent card") {
             }
         }
         keys_by_group[{player, own_card, public_card, round1_betting_actions, round2_betting_actions}]
-            .insert(game.infoset_key(s));
+            .insert(game.infoset_label(s));
     });
 
     for (auto& [group, keys] : keys_by_group) {

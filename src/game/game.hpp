@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
@@ -27,7 +28,9 @@ public:
     virtual std::vector<Action> legal_actions(const State& state) const = 0;
     virtual State apply_action(const State& state, Action action) const = 0;
     virtual double terminal_utility(const State& state, Player player) const = 0;
-    virtual InfoSetKey infoset_key(const State& state) const = 0;
+    virtual InfoSetKey infoset_label(const State& state) const = 0;
+    virtual std::uint32_t infoset_count() const = 0;
+    virtual std::uint32_t infoset_index(const State& state) const = 0;
     virtual std::vector<std::pair<Action, double>> chance_outcomes(const State& state) const = 0;
 };
 

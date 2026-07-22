@@ -26,7 +26,7 @@ double expected_value(const Game& game, const StrategyProfile& profile, Player p
     }
 
     std::vector<Action> actions = game.legal_actions(state);
-    auto profile_entry = profile.find(game.infoset_key(state));
+    auto profile_entry = profile.find(game.infoset_label(state));
     double uniform_probability = 1.0 / static_cast<double>(actions.size());
 
     double value = 0.0;

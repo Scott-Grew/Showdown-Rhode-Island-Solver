@@ -17,7 +17,7 @@ StrategyProfile uniform_profile(const Game& game) {
     StrategyProfile profile;
     walk(game, game.initial_state(), [&](const State& state) {
         if (game.is_terminal(state) || game.is_chance(state)) return;
-        InfoSetKey key = game.infoset_key(state);
+        InfoSetKey key = game.infoset_label(state);
         if (profile.count(key)) return;
         std::size_t action_count = game.legal_actions(state).size();
         profile[key] = std::vector<double>(action_count, 1.0 / static_cast<double>(action_count));
@@ -32,7 +32,7 @@ StrategyProfile pure_action_profile(const Game& game, Player player, bool use_la
         std::vector<Action> actions = game.legal_actions(state);
         std::vector<double> strategy(actions.size(), 0.0);
         strategy[use_last_action ? actions.size() - 1 : 0] = 1.0;
-        profile[game.infoset_key(state)] = strategy;
+        profile[game.infoset_label(state)] = strategy;
     });
     return profile;
 }
@@ -48,7 +48,7 @@ double expected_value(const Game& game, const StrategyProfile& profile, Player p
     }
 
     std::vector<Action> actions = game.legal_actions(state);
-    auto profile_entry = profile.find(game.infoset_key(state));
+    auto profile_entry = profile.find(game.infoset_label(state));
     double uniform_probability = 1.0 / static_cast<double>(actions.size());
 
     double value = 0.0;

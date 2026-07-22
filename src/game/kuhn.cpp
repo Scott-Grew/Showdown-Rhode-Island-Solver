@@ -113,7 +113,7 @@ double KuhnGame::terminal_utility(const State& state, Player player) const {
     return player == 0 ? utility : -utility;
 }
 
-InfoSetKey KuhnGame::infoset_key(const State& state) const {
+InfoSetKey KuhnGame::infoset_label(const State& state) const {
     Player player = current_player(state);
     std::vector<Action> betting = betting_history(state);
 
@@ -122,6 +122,23 @@ InfoSetKey KuhnGame::infoset_key(const State& state) const {
         key += action_name(action) + ",";
     }
     return key;
+}
+
+int KuhnGame::betting_stage(const std::vector<Action>& betting) {
+    if (betting.empty()) return 0;
+    if (betting.size() == 1) return betting[0] == kActionCheck ? 1 : 2;
+    return 3;
+}
+
+std::uint32_t KuhnGame::infoset_count() const {
+    return 4 * kKuhnDeckSize;
+}
+
+std::uint32_t KuhnGame::infoset_index(const State& state) const {
+    Player player = current_player(state);
+    std::vector<Action> betting = betting_history(state);
+    int stage = betting_stage(betting);
+    return static_cast<std::uint32_t>(stage * kKuhnDeckSize + state.private_cards[player]);
 }
 
 std::vector<std::pair<Action, double>> KuhnGame::chance_outcomes(const State& state) const {
