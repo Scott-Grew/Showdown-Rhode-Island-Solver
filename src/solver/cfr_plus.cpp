@@ -1,13 +1,51 @@
 #include "solver/cfr_plus.hpp"
 
+#include <bit>
 #include <cstddef>
+#include <cstdint>
+#include <fstream>
 #include <numeric>
+#include <stdexcept>
 
 namespace cfr::solver {
 
 namespace {
 
 constexpr double kStrategySumEpsilon = 1e-12;
+constexpr char kCheckpointHeader[] = "CFRPLUS_CHECKPOINT_V1";
+
+void write_table(std::ostream& output, const std::vector<std::vector<double>>& table) {
+    for (const std::vector<double>& infoset_values : table) {
+        output << infoset_values.size();
+        for (double value : infoset_values) {
+            output << ' ' << std::hex << std::bit_cast<std::uint64_t>(value) << std::dec;
+        }
+        output << '\n';
+    }
+}
+
+std::vector<std::vector<double>> read_table(std::istream& input, std::uint32_t infoset_count) {
+    std::vector<std::vector<double>> table(infoset_count);
+    for (std::uint32_t infoset_index = 0; infoset_index < infoset_count; ++infoset_index) {
+        std::size_t action_count;
+        input >> action_count;
+        table[infoset_index].resize(action_count);
+        for (std::size_t action_index = 0; action_index < action_count; ++action_index) {
+            std::uint64_t bits;
+            input >> std::hex >> bits >> std::dec;
+            table[infoset_index][action_index] = std::bit_cast<double>(bits);
+        }
+    }
+    return table;
+}
+
+void expect_token(std::istream& input, const std::string& expected) {
+    std::string token;
+    input >> token;
+    if (token != expected) {
+        throw std::runtime_error("cfr_plus checkpoint: expected '" + expected + "', found '" + token + "'");
+    }
+}
 
 template <typename StrategyFromStored>
 void collect_strategy_profile(const game::Game& game, const game::State& state,
@@ -143,5 +181,54 @@ StrategyProfile CfrPlus::average_strategy() const {
 }
 
 int CfrPlus::iterations_run() const { return iteration_; }
+
+void CfrPlus::save_checkpoint(const std::string& path) const {
+    std::ofstream output(path);
+    if (!output) {
+        throw std::runtime_error("cfr_plus checkpoint: could not open '" + path + "' for writing");
+    }
+
+    output << kCheckpointHeader << '\n';
+    output << "iteration " << iteration_ << '\n';
+    output << "infoset_count " << cumulative_regrets_.size() << '\n';
+    output << "regrets\n";
+    write_table(output, cumulative_regrets_);
+    output << "strategy_sums\n";
+    write_table(output, strategy_sums_);
+}
+
+CfrPlus CfrPlus::load_checkpoint(const game::Game& game, const std::string& path) {
+    std::ifstream input(path);
+    if (!input) {
+        throw std::runtime_error("cfr_plus checkpoint: could not open '" + path + "' for reading");
+    }
+
+    expect_token(input, kCheckpointHeader);
+
+    expect_token(input, "iteration");
+    int iteration;
+    input >> iteration;
+
+    expect_token(input, "infoset_count");
+    std::uint32_t infoset_count;
+    input >> infoset_count;
+    if (infoset_count != game.infoset_count()) {
+        throw std::runtime_error("cfr_plus checkpoint: infoset_count mismatch (checkpoint has " +
+                                  std::to_string(infoset_count) + ", game has " +
+                                  std::to_string(game.infoset_count()) + ")");
+    }
+
+    expect_token(input, "regrets");
+    std::vector<std::vector<double>> cumulative_regrets = read_table(input, infoset_count);
+
+    expect_token(input, "strategy_sums");
+    std::vector<std::vector<double>> strategy_sums = read_table(input, infoset_count);
+
+    CfrPlus solver(game);
+    solver.iteration_ = iteration;
+    solver.cumulative_regrets_ = std::move(cumulative_regrets);
+    solver.strategy_sums_ = std::move(strategy_sums);
+    return solver;
+}
 
 }
