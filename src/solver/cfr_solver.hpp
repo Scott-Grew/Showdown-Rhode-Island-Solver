@@ -1,20 +1,26 @@
-#include "solver/cfr_plus.hpp"
+#pragma once
 
+#include <array>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
 #include <numeric>
 #include <stdexcept>
+#include <string>
+#include <vector>
+
+#include "game/game.hpp"
+#include "solver/strategy.hpp"
 
 namespace cfr::solver {
 
-namespace {
+namespace detail {
 
-constexpr double kStrategySumEpsilon = 1e-12;
-constexpr char kCheckpointHeader[] = "CFRPLUS_CHECKPOINT_V1";
+inline constexpr double kStrategySumEpsilon = 1e-12;
+inline constexpr char kCheckpointHeader[] = "CFRPLUS_CHECKPOINT_V1";
 
-void write_table(std::ostream& output, const std::vector<std::vector<double>>& table) {
+inline void write_table(std::ostream& output, const std::vector<std::vector<double>>& table) {
     for (const std::vector<double>& infoset_values : table) {
         output << infoset_values.size();
         for (double value : infoset_values) {
@@ -24,7 +30,7 @@ void write_table(std::ostream& output, const std::vector<std::vector<double>>& t
     }
 }
 
-std::vector<std::vector<double>> read_table(std::istream& input, std::uint32_t infoset_count) {
+inline std::vector<std::vector<double>> read_table(std::istream& input, std::uint32_t infoset_count) {
     std::vector<std::vector<double>> table(infoset_count);
     for (std::uint32_t infoset_index = 0; infoset_index < infoset_count; ++infoset_index) {
         std::size_t action_count;
@@ -39,7 +45,7 @@ std::vector<std::vector<double>> read_table(std::istream& input, std::uint32_t i
     return table;
 }
 
-void expect_token(std::istream& input, const std::string& expected) {
+inline void expect_token(std::istream& input, const std::string& expected) {
     std::string token;
     input >> token;
     if (token != expected) {
@@ -73,14 +79,65 @@ void collect_strategy_profile(const game::Game& game, const game::State& state,
 
 }
 
-CfrPlus::CfrPlus(const game::Game& game)
+struct VanillaRules {
+    static bool updates(int, game::Player) { return true; }
+
+    static void accumulate(std::vector<double>& cumulative_regrets, const std::vector<double>& increments) {
+        for (std::size_t i = 0; i < cumulative_regrets.size(); ++i) {
+            cumulative_regrets[i] += increments[i];
+        }
+    }
+
+    static double weight(int) { return 1.0; }
+};
+
+struct CfrPlusRules {
+    static bool updates(int iteration, game::Player acting_player) { return acting_player == iteration % 2; }
+
+    static void accumulate(std::vector<double>& cumulative_regrets, const std::vector<double>& increments) {
+        accumulate_regret_plus(cumulative_regrets, increments);
+    }
+
+    static double weight(int iteration) { return static_cast<double>(iteration); }
+};
+
+template <typename Rules>
+class CfrSolver {
+public:
+    explicit CfrSolver(const game::Game& game);
+
+    void run_iterations(int iteration_count);
+
+    StrategyProfile average_strategy() const;
+    StrategyProfile current_strategy() const;
+
+    int iterations_run() const;
+
+    void save_checkpoint(const std::string& path) const;
+    static CfrSolver load_checkpoint(const game::Game& game, const std::string& path);
+
+private:
+
+    std::array<double, 2> traverse(const game::State& state, double player0_reach, double player1_reach,
+                                    double chance_reach);
+
+    const game::Game& game_;
+    std::vector<std::vector<double>> cumulative_regrets_;
+    std::vector<std::vector<double>> regret_snapshot_;
+    std::vector<std::vector<double>> strategy_sums_;
+    int iteration_ = 0;
+};
+
+template <typename Rules>
+CfrSolver<Rules>::CfrSolver(const game::Game& game)
     : game_(game),
       cumulative_regrets_(game.infoset_count()),
       regret_snapshot_(game.infoset_count()),
       strategy_sums_(game.infoset_count()) {}
 
-std::array<double, 2> CfrPlus::traverse(const game::State& state, double player0_reach, double player1_reach,
-                                         double chance_reach, game::Player updating_player) {
+template <typename Rules>
+std::array<double, 2> CfrSolver<Rules>::traverse(const game::State& state, double player0_reach, double player1_reach,
+                                                   double chance_reach) {
     if (game_.is_terminal(state)) {
         return {game_.terminal_utility(state, 0), game_.terminal_utility(state, 1)};
     }
@@ -88,8 +145,8 @@ std::array<double, 2> CfrPlus::traverse(const game::State& state, double player0
     if (game_.is_chance(state)) {
         std::array<double, 2> node_value = {0.0, 0.0};
         for (auto& [action, probability] : game_.chance_outcomes(state)) {
-            std::array<double, 2> child_value = traverse(game_.apply_action(state, action), player0_reach,
-                                                           player1_reach, chance_reach * probability, updating_player);
+            std::array<double, 2> child_value =
+                traverse(game_.apply_action(state, action), player0_reach, player1_reach, chance_reach * probability);
             node_value[0] += probability * child_value[0];
             node_value[1] += probability * child_value[1];
         }
@@ -112,14 +169,14 @@ std::array<double, 2> CfrPlus::traverse(const game::State& state, double player0
     for (std::size_t i = 0; i < actions.size(); ++i) {
         double next_player0_reach = acting_player == 0 ? player0_reach * strategy[i] : player0_reach;
         double next_player1_reach = acting_player == 1 ? player1_reach * strategy[i] : player1_reach;
-        std::array<double, 2> child_value = traverse(game_.apply_action(state, actions[i]), next_player0_reach,
-                                                       next_player1_reach, chance_reach, updating_player);
+        std::array<double, 2> child_value =
+            traverse(game_.apply_action(state, actions[i]), next_player0_reach, next_player1_reach, chance_reach);
         node_value[0] += strategy[i] * child_value[0];
         node_value[1] += strategy[i] * child_value[1];
         acting_player_action_value[i] = child_value[acting_player];
     }
 
-    if (acting_player == updating_player) {
+    if (Rules::updates(iteration_, acting_player)) {
         double opponent_reach = acting_player == 0 ? player1_reach : player0_reach;
         double counterfactual_reach = opponent_reach * chance_reach;
         std::vector<double> increment(actions.size());
@@ -129,42 +186,46 @@ std::array<double, 2> CfrPlus::traverse(const game::State& state, double player0
 
         std::vector<double>& cumulative_regrets = cumulative_regrets_[infoset_index];
         if (cumulative_regrets.empty()) cumulative_regrets.assign(actions.size(), 0.0);
-        accumulate_regret_plus(cumulative_regrets, increment);
+        Rules::accumulate(cumulative_regrets, increment);
 
         std::vector<double>& strategy_sum = strategy_sums_[infoset_index];
         if (strategy_sum.empty()) strategy_sum.assign(actions.size(), 0.0);
+        double strategy_weight = Rules::weight(iteration_);
         for (std::size_t i = 0; i < actions.size(); ++i) {
-            strategy_sum[i] += iteration_ * acting_player_reach * strategy[i];
+            strategy_sum[i] += strategy_weight * acting_player_reach * strategy[i];
         }
     }
 
     return node_value;
 }
 
-void CfrPlus::run_iterations(int iteration_count) {
+template <typename Rules>
+void CfrSolver<Rules>::run_iterations(int iteration_count) {
     for (int i = 0; i < iteration_count; ++i) {
         ++iteration_;
-        game::Player updating_player = iteration_ % 2;
         regret_snapshot_ = cumulative_regrets_;
-        traverse(game_.initial_state(), 1.0, 1.0, 1.0, updating_player);
+        traverse(game_.initial_state(), 1.0, 1.0, 1.0);
     }
 }
 
-StrategyProfile CfrPlus::current_strategy() const {
+template <typename Rules>
+StrategyProfile CfrSolver<Rules>::current_strategy() const {
     StrategyProfile profile;
-    collect_strategy_profile(game_, game_.initial_state(), cumulative_regrets_, regret_matching_strategy, profile);
+    detail::collect_strategy_profile(game_, game_.initial_state(), cumulative_regrets_, regret_matching_strategy,
+                                      profile);
     return profile;
 }
 
-StrategyProfile CfrPlus::average_strategy() const {
+template <typename Rules>
+StrategyProfile CfrSolver<Rules>::average_strategy() const {
     StrategyProfile profile;
-    collect_strategy_profile(
+    detail::collect_strategy_profile(
         game_, game_.initial_state(), strategy_sums_,
         [](const std::vector<double>& strategy_sum) {
             double total = std::accumulate(strategy_sum.begin(), strategy_sum.end(), 0.0);
 
             std::vector<double> strategy(strategy_sum.size());
-            if (total > kStrategySumEpsilon) {
+            if (total > detail::kStrategySumEpsilon) {
                 for (std::size_t i = 0; i < strategy_sum.size(); ++i) {
                     strategy[i] = strategy_sum[i] / total;
                 }
@@ -180,36 +241,41 @@ StrategyProfile CfrPlus::average_strategy() const {
     return profile;
 }
 
-int CfrPlus::iterations_run() const { return iteration_; }
+template <typename Rules>
+int CfrSolver<Rules>::iterations_run() const {
+    return iteration_;
+}
 
-void CfrPlus::save_checkpoint(const std::string& path) const {
+template <typename Rules>
+void CfrSolver<Rules>::save_checkpoint(const std::string& path) const {
     std::ofstream output(path);
     if (!output) {
         throw std::runtime_error("cfr_plus checkpoint: could not open '" + path + "' for writing");
     }
 
-    output << kCheckpointHeader << '\n';
+    output << detail::kCheckpointHeader << '\n';
     output << "iteration " << iteration_ << '\n';
     output << "infoset_count " << cumulative_regrets_.size() << '\n';
     output << "regrets\n";
-    write_table(output, cumulative_regrets_);
+    detail::write_table(output, cumulative_regrets_);
     output << "strategy_sums\n";
-    write_table(output, strategy_sums_);
+    detail::write_table(output, strategy_sums_);
 }
 
-CfrPlus CfrPlus::load_checkpoint(const game::Game& game, const std::string& path) {
+template <typename Rules>
+CfrSolver<Rules> CfrSolver<Rules>::load_checkpoint(const game::Game& game, const std::string& path) {
     std::ifstream input(path);
     if (!input) {
         throw std::runtime_error("cfr_plus checkpoint: could not open '" + path + "' for reading");
     }
 
-    expect_token(input, kCheckpointHeader);
+    detail::expect_token(input, detail::kCheckpointHeader);
 
-    expect_token(input, "iteration");
+    detail::expect_token(input, "iteration");
     int iteration;
     input >> iteration;
 
-    expect_token(input, "infoset_count");
+    detail::expect_token(input, "infoset_count");
     std::uint32_t infoset_count;
     input >> infoset_count;
     if (infoset_count != game.infoset_count()) {
@@ -218,17 +284,20 @@ CfrPlus CfrPlus::load_checkpoint(const game::Game& game, const std::string& path
                                   std::to_string(game.infoset_count()) + ")");
     }
 
-    expect_token(input, "regrets");
-    std::vector<std::vector<double>> cumulative_regrets = read_table(input, infoset_count);
+    detail::expect_token(input, "regrets");
+    std::vector<std::vector<double>> cumulative_regrets = detail::read_table(input, infoset_count);
 
-    expect_token(input, "strategy_sums");
-    std::vector<std::vector<double>> strategy_sums = read_table(input, infoset_count);
+    detail::expect_token(input, "strategy_sums");
+    std::vector<std::vector<double>> strategy_sums = detail::read_table(input, infoset_count);
 
-    CfrPlus solver(game);
+    CfrSolver solver(game);
     solver.iteration_ = iteration;
     solver.cumulative_regrets_ = std::move(cumulative_regrets);
     solver.strategy_sums_ = std::move(strategy_sums);
     return solver;
 }
+
+using VanillaCfr = CfrSolver<VanillaRules>;
+using CfrPlus = CfrSolver<CfrPlusRules>;
 
 }

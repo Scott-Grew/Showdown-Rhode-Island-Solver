@@ -62,8 +62,6 @@ target_include_directories(cfr_eval_naive_ref PUBLIC ${CMAKE_SOURCE_DIR}/src)
 add_library(cfr_solver STATIC
     src/solver/strategy.cpp
     src/solver/best_response.cpp
-    src/solver/vanilla_cfr.cpp
-    src/solver/cfr_plus.cpp
 )
 target_include_directories(cfr_solver PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(cfr_solver PUBLIC cfr_game)
