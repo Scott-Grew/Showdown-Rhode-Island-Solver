@@ -1,24 +1,28 @@
-.PHONY: build test bench asan test-fallback
+.PHONY: build test bench asan test-fallback clean
+
+RELEASE_DIR := .build/release
+ASAN_DIR := .build/asan
+FALLBACK_DIR := .build/fallback
 
 build:
-	cmake -B build -DCMAKE_BUILD_TYPE=Release
-	cmake --build build
+	cmake -B $(RELEASE_DIR) -DCMAKE_BUILD_TYPE=Release
+	cmake --build $(RELEASE_DIR)
 
 test: build
-	ctest --test-dir build --output-on-failure
+	ctest --test-dir $(RELEASE_DIR) --output-on-failure
 
 bench: build
-	./build/cfr_bench
+	./$(RELEASE_DIR)/cfr_bench
 
 asan:
-	cmake -B build-asan -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
-	cmake --build build-asan
-	ctest --test-dir build-asan --output-on-failure
+	cmake -B $(ASAN_DIR) -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+	cmake --build $(ASAN_DIR)
+	ctest --test-dir $(ASAN_DIR) --output-on-failure
 
-# Separate build dir, -mavx2 skipped and CFR_FORCE_SCALAR_BATCH defined so
-# eval7.cpp's non-AVX2 branch actually gets compiled and exercised (V9),
-# instead of only ever running on whatever machine happens to lack AVX2.
 test-fallback:
-	cmake -B build-fallback -DCMAKE_BUILD_TYPE=Release -DCFR_DISABLE_AVX2=ON
-	cmake --build build-fallback
-	ctest --test-dir build-fallback --output-on-failure
+	cmake -B $(FALLBACK_DIR) -DCMAKE_BUILD_TYPE=Release -DCFR_DISABLE_AVX2=ON
+	cmake --build $(FALLBACK_DIR)
+	ctest --test-dir $(FALLBACK_DIR) --output-on-failure
+
+clean:
+	rm -rf .build .deps

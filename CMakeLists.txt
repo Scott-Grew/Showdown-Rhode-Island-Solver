@@ -28,10 +28,12 @@ elseif(CFR_HAS_AVX2_FLAG)
 endif()
 
 include(FetchContent)
+set(FETCHCONTENT_BASE_DIR ${CMAKE_SOURCE_DIR}/.deps CACHE PATH "Shared dependency cache")
 FetchContent_Declare(
     Catch2
     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
     GIT_TAG v3.7.1
+    GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(Catch2)
 
