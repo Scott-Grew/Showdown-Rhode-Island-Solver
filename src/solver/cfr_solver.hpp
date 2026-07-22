@@ -18,7 +18,8 @@ namespace cfr::solver {
 namespace detail {
 
 inline constexpr double kStrategySumEpsilon = 1e-12;
-inline constexpr char kCheckpointHeader[] = "CFRPLUS_CHECKPOINT_V1";
+inline constexpr char kCheckpointHeader[] = "CFR_CHECKPOINT_V2";
+inline constexpr std::size_t kMaxActionsPerInfoset = 64;
 
 inline void write_table(std::ostream& output, const std::vector<std::vector<double>>& table) {
     for (const std::vector<double>& infoset_values : table) {
@@ -35,10 +36,15 @@ inline std::vector<std::vector<double>> read_table(std::istream& input, std::uin
     for (std::uint32_t infoset_index = 0; infoset_index < infoset_count; ++infoset_index) {
         std::size_t action_count;
         input >> action_count;
+        if (!input) throw std::runtime_error("cfr checkpoint: truncated before infoset row");
+        if (action_count > kMaxActionsPerInfoset) {
+            throw std::runtime_error("cfr checkpoint: implausible action count " + std::to_string(action_count));
+        }
         table[infoset_index].resize(action_count);
         for (std::size_t action_index = 0; action_index < action_count; ++action_index) {
             std::uint64_t bits;
             input >> std::hex >> bits >> std::dec;
+            if (!input) throw std::runtime_error("cfr checkpoint: truncated inside infoset row");
             table[infoset_index][action_index] = std::bit_cast<double>(bits);
         }
     }
@@ -49,7 +55,7 @@ inline void expect_token(std::istream& input, const std::string& expected) {
     std::string token;
     input >> token;
     if (token != expected) {
-        throw std::runtime_error("cfr_plus checkpoint: expected '" + expected + "', found '" + token + "'");
+        throw std::runtime_error("cfr checkpoint: expected '" + expected + "', found '" + token + "'");
     }
 }
 
@@ -80,6 +86,8 @@ void collect_strategy_profile(const game::Game& game, const game::State& state,
 }
 
 struct VanillaRules {
+    static constexpr const char* kPolicyName = "vanilla";
+
     static bool updates(int, game::Player) { return true; }
 
     static void accumulate(std::vector<double>& cumulative_regrets, const std::vector<double>& increments) {
@@ -92,6 +100,8 @@ struct VanillaRules {
 };
 
 struct CfrPlusRules {
+    static constexpr const char* kPolicyName = "cfr_plus";
+
     static bool updates(int iteration, game::Player acting_player) { return acting_player == iteration % 2; }
 
     static void accumulate(std::vector<double>& cumulative_regrets, const std::vector<double>& increments) {
@@ -250,10 +260,11 @@ template <typename Rules>
 void CfrSolver<Rules>::save_checkpoint(const std::string& path) const {
     std::ofstream output(path);
     if (!output) {
-        throw std::runtime_error("cfr_plus checkpoint: could not open '" + path + "' for writing");
+        throw std::runtime_error("cfr checkpoint: could not open '" + path + "' for writing");
     }
 
     output << detail::kCheckpointHeader << '\n';
+    output << "policy " << Rules::kPolicyName << '\n';
     output << "iteration " << iteration_ << '\n';
     output << "infoset_count " << cumulative_regrets_.size() << '\n';
     output << "regrets\n";
@@ -266,20 +277,24 @@ template <typename Rules>
 CfrSolver<Rules> CfrSolver<Rules>::load_checkpoint(const game::Game& game, const std::string& path) {
     std::ifstream input(path);
     if (!input) {
-        throw std::runtime_error("cfr_plus checkpoint: could not open '" + path + "' for reading");
+        throw std::runtime_error("cfr checkpoint: could not open '" + path + "' for reading");
     }
 
     detail::expect_token(input, detail::kCheckpointHeader);
+    detail::expect_token(input, "policy");
+    detail::expect_token(input, Rules::kPolicyName);
 
     detail::expect_token(input, "iteration");
     int iteration;
     input >> iteration;
+    if (!input) throw std::runtime_error("cfr checkpoint: truncated header");
 
     detail::expect_token(input, "infoset_count");
     std::uint32_t infoset_count;
     input >> infoset_count;
+    if (!input) throw std::runtime_error("cfr checkpoint: truncated header");
     if (infoset_count != game.infoset_count()) {
-        throw std::runtime_error("cfr_plus checkpoint: infoset_count mismatch (checkpoint has " +
+        throw std::runtime_error("cfr checkpoint: infoset_count mismatch (checkpoint has " +
                                   std::to_string(infoset_count) + ", game has " +
                                   std::to_string(game.infoset_count()) + ")");
     }
