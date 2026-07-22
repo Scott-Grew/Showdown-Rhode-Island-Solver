@@ -34,10 +34,6 @@ std::array<Card, 7> random_seven_card_hand(std::mt19937_64& rng) {
     return hand;
 }
 
-// All C(7,5) = 21 ways to choose 5 of 7 card slots. Deliberately a separate
-// copy from eval7.cpp's own subset table -- this test exists to catch a bug
-// in evaluate_7card, so it can't rely on the code under test to supply the
-// list it's checked against.
 constexpr std::array<std::array<int, 5>, 21> kFiveOfSevenSubsets = {{
     {0, 1, 2, 3, 4}, {0, 1, 2, 3, 5}, {0, 1, 2, 3, 6}, {0, 1, 2, 4, 5}, {0, 1, 2, 4, 6},
     {0, 1, 2, 5, 6}, {0, 1, 3, 4, 5}, {0, 1, 3, 4, 6}, {0, 1, 3, 5, 6}, {0, 1, 4, 5, 6},
@@ -56,9 +52,9 @@ HandRank brute_force_best_of_21(const std::array<Card, 7>& hand) {
     return best;
 }
 
-}  // namespace
+}
 
-TEST_CASE("eval7: evaluate_7card equals the best of 21 5-card subsets over 10^5 random boards") {  // V5
+TEST_CASE("V5: eval7 evaluate_7card equals the best of 21 5-card subsets over 10^5 random boards") {
     std::mt19937_64 rng(0xE7A17CA2D);
     constexpr int kBoardCount = 100'000;
     for (int trial = 0; trial < kBoardCount; ++trial) {
@@ -67,7 +63,7 @@ TEST_CASE("eval7: evaluate_7card equals the best of 21 5-card subsets over 10^5 
     }
 }
 
-TEST_CASE("eval7: batch results equal scalar evaluate_7card over 10^5 random boards") {  // V9
+TEST_CASE("V9: eval7 batch results equal scalar evaluate_7card over 10^5 random boards") {
     std::mt19937_64 rng(0xBA7C44ED);
     constexpr std::size_t kBoardCount = 100'000;
     constexpr int kCardsPerHand = 7;

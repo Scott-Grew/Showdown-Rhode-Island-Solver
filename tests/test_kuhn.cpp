@@ -11,7 +11,7 @@
 
 using namespace cfr::game;
 
-TEST_CASE("kuhn: zero-sum at every terminal") {            // V1
+TEST_CASE("V1: kuhn zero-sum at every terminal") {
     KuhnGame game;
     walk(game, game.initial_state(), [&](const State& s) {
         if (!game.is_terminal(s)) return;
@@ -19,7 +19,7 @@ TEST_CASE("kuhn: zero-sum at every terminal") {            // V1
     });
 }
 
-TEST_CASE("kuhn: exactly 12 infosets") {                   // V8
+TEST_CASE("V8: kuhn exactly 12 infosets") {
     KuhnGame game;
     std::set<InfoSetKey> keys;
     walk(game, game.initial_state(), [&](const State& s) {
@@ -29,9 +29,8 @@ TEST_CASE("kuhn: exactly 12 infosets") {                   // V8
     REQUIRE(keys.size() == 12);
 }
 
-TEST_CASE("kuhn: infoset key hides opponent card") {        // V2
-    // states equal in own card + history but different opponent card → same key
-    // build by walking, group by (current_player, own card, history), assert 1 key per group
+TEST_CASE("V2: kuhn infoset key hides opponent card") {
+
     KuhnGame game;
     std::map<std::tuple<int, int, std::vector<int>>, std::set<InfoSetKey>> keys_by_group;
 
@@ -48,7 +47,7 @@ TEST_CASE("kuhn: infoset key hides opponent card") {        // V2
     }
 }
 
-TEST_CASE("kuhn: legal_actions non-empty at every non-terminal, non-chance state") {  // V3
+TEST_CASE("V3: kuhn legal_actions non-empty at every non-terminal, non-chance state") {
     KuhnGame game;
     walk(game, game.initial_state(), [&](const State& s) {
         if (game.is_terminal(s) || game.is_chance(s)) return;
@@ -56,7 +55,7 @@ TEST_CASE("kuhn: legal_actions non-empty at every non-terminal, non-chance state
     });
 }
 
-TEST_CASE("kuhn: chance outcome probabilities sum to 1") {  // V6
+TEST_CASE("V6: kuhn chance outcome probabilities sum to 1") {
     KuhnGame game;
     walk(game, game.initial_state(), [&](const State& s) {
         if (!game.is_chance(s)) return;
@@ -71,10 +70,10 @@ TEST_CASE("kuhn: chance outcome probabilities sum to 1") {  // V6
 TEST_CASE("kuhn: J bets, K calls -> J loses 2") {
     KuhnGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kKuhnJack);    // deal J to player 0
-    state = game.apply_action(state, kKuhnKing);     // deal K to player 1
-    state = game.apply_action(state, kActionBet);    // player 0 bets
-    state = game.apply_action(state, kActionCall);   // player 1 calls
+    state = game.apply_action(state, kKuhnJack);
+    state = game.apply_action(state, kKuhnKing);
+    state = game.apply_action(state, kActionBet);
+    state = game.apply_action(state, kActionCall);
     REQUIRE(game.is_terminal(state));
     REQUIRE(game.terminal_utility(state, 0) == -2.0);
     REQUIRE(game.terminal_utility(state, 1) == 2.0);
@@ -83,10 +82,10 @@ TEST_CASE("kuhn: J bets, K calls -> J loses 2") {
 TEST_CASE("kuhn: bet-fold pays the bettor 1") {
     KuhnGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kKuhnQueen);   // deal Q to player 0
-    state = game.apply_action(state, kKuhnKing);    // deal K to player 1
-    state = game.apply_action(state, kActionBet);   // player 0 bets
-    state = game.apply_action(state, kActionFold);  // player 1 folds
+    state = game.apply_action(state, kKuhnQueen);
+    state = game.apply_action(state, kKuhnKing);
+    state = game.apply_action(state, kActionBet);
+    state = game.apply_action(state, kActionFold);
     REQUIRE(game.is_terminal(state));
     REQUIRE(game.terminal_utility(state, 0) == 1.0);
     REQUIRE(game.terminal_utility(state, 1) == -1.0);

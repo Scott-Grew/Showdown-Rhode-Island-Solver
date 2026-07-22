@@ -13,9 +13,9 @@ using cfr::card_rank;
 using cfr::card_suit;
 using cfr::kRankCount;
 
-constexpr std::array<int, 5> kWheelRanksAscending = {0, 1, 2, 3, 12};  // A-2-3-4-5, ace plays low
+constexpr std::array<int, 5> kWheelRanksAscending = {0, 1, 2, 3, 12};
 
-}  // namespace
+}
 
 NaiveRank naive_evaluate_5card(const Card* cards) {
     std::array<int, kRankCount> rank_counts = {};
@@ -34,12 +34,8 @@ NaiveRank naive_evaluate_5card(const Card* cards) {
     bool all_distinct = std::adjacent_find(sorted_ranks.begin(), sorted_ranks.end()) == sorted_ranks.end();
     bool is_wheel = sorted_ranks == kWheelRanksAscending;
     bool is_straight = all_distinct && (is_wheel || sorted_ranks.back() - sorted_ranks.front() == 4);
-    int straight_high = is_wheel ? 3 : sorted_ranks.back();  // wheel plays the 5 as its top card
+    int straight_high = is_wheel ? 3 : sorted_ranks.back();
 
-    // (count, rank) for every rank present, sorted by count descending then
-    // rank descending -- this sequence's count pattern (e.g. [3, 2]) directly
-    // names the category, and the sequence itself is the tiebreak digit
-    // order a human would compare by hand.
     std::vector<std::pair<int, int>> count_rank_pairs;
     for (int rank = 0; rank < kRankCount; ++rank) {
         if (rank_counts[rank] > 0) count_rank_pairs.emplace_back(rank_counts[rank], rank);
@@ -77,4 +73,4 @@ NaiveRank naive_evaluate_5card(const Card* cards) {
     return result;
 }
 
-}  // namespace cfr::eval::naive
+}

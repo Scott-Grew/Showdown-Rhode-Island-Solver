@@ -13,8 +13,6 @@ using cfr::card_rank;
 using cfr::card_suit;
 using cfr::kRankCount;
 
-// Category ordinals, weakest to strongest -- multiplied by kCategoryBudget
-// below so category always dominates the encoding, regardless of tiebreak.
 constexpr int kHighCard = 0;
 constexpr int kOnePair = 1;
 constexpr int kTwoPair = 2;
@@ -25,15 +23,8 @@ constexpr int kFullHouse = 6;
 constexpr int kFourOfAKind = 7;
 constexpr int kStraightFlush = 8;
 
-// One pair is the widest category: pair rank (13) x 3-kicker combos
-// (C(12,3) = 220) = 2860 distinct hands. Every other category's tiebreak
-// range fits comfortably under this, so `category * kCategoryBudget +
-// tiebreak` never lets a weaker category's tiebreak spill into a stronger
-// category's range.
 constexpr int kCategoryBudget = 2860;
 
-// C(n, k) via the standard incremental product-then-divide form; each
-// partial result is exact because it equals C(n, i+1) after step i.
 constexpr int binomial(int n, int k) {
     if (k < 0 || k > n) return 0;
     int result = 1;
@@ -43,11 +34,6 @@ constexpr int binomial(int n, int k) {
     return result;
 }
 
-// Combinatorial-number-system index of an ascending subset (colex order):
-// index = sum C(value_i, position_i). Colex order on ascending-sorted
-// subsets is exactly lexicographic order on the same subsets sorted
-// descending -- exactly how poker kickers are compared (highest rank
-// first) -- so this index is monotonic in hand strength by construction.
 template <std::size_t N>
 int colex_index(const std::array<int, N>& ascending_subset) {
     int index = 0;
@@ -57,9 +43,6 @@ int colex_index(const std::array<int, N>& ascending_subset) {
     return index;
 }
 
-// Maps `rank` into a compacted index for a universe with `excluded` ranks
-// removed, so colex_index() sees a contiguous 0..(kRankCount-1-len) range.
-// `excluded` must not contain `rank`.
 int compact_rank(int rank, std::initializer_list<int> excluded) {
     int shift = 0;
     for (int excluded_rank : excluded) {
@@ -68,11 +51,9 @@ int compact_rank(int rank, std::initializer_list<int> excluded) {
     return rank - shift;
 }
 
-// Bitmask of the wheel's ranks (A-2-3-4-5: ranks 12, 0, 1, 2, 3) -- the one
-// straight whose top card (the ace) plays low instead of high.
 constexpr std::uint32_t kWheelBitmask = 0x100F;
 
-}  // namespace
+}
 
 HandRank evaluate_5card(const Card* cards) {
     std::array<int, kRankCount> rank_counts = {};
@@ -93,7 +74,7 @@ HandRank evaluate_5card(const Card* cards) {
     if (all_distinct_ranks) {
         if (is_wheel) {
             is_straight = true;
-            straight_high = 3;  // wheel (A-2-3-4-5) plays the 5 as its top card
+            straight_high = 3;
         } else {
             int lowest_set_bit = std::countr_zero(rank_bitmask);
             int highest_set_bit = 31 - std::countl_zero(rank_bitmask);
@@ -111,11 +92,6 @@ HandRank evaluate_5card(const Card* cards) {
         return static_cast<HandRank>(kStraight * kCategoryBudget + straight_high);
     }
 
-    // Bucket every rank present into its count group so quads/boat/trips/
-    // two-pair/pair/high-card/flush can all read off this one pass instead
-    // of re-deriving it per branch below. Ranks are visited ascending, so
-    // each bucket fills in ascending order -- exactly what colex_index() and
-    // the direct pair/kicker comparisons below require.
     int quad_rank = -1;
     int trip_rank = -1;
     std::array<int, 2> pair_ranks = {-1, -1};
@@ -160,4 +136,4 @@ HandRank evaluate_5card(const Card* cards) {
     return static_cast<HandRank>(kHighCard * kCategoryBudget + colex_index(single_ranks));
 }
 
-}  // namespace cfr::eval
+}

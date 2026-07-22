@@ -6,22 +6,17 @@
 
 namespace cfr::game {
 
-using Player = int;                    // 0, 1; chance = -1
-using Action = int;                    // game-defined encoding
-using InfoSetKey = std::string;        // M0: readable; packed key = later latitude
+using Player = int;
+using Action = int;
+using InfoSetKey = std::string;
 
-// State: value-semantic tagged container, game interprets contents.
 struct State {
-    std::vector<int> private_cards;   // per player; -1 = undealt
+    std::vector<int> private_cards;
     std::vector<int> public_cards;
-    std::vector<Action> history;      // actions incl. chance outcomes as dealt-card ids
+    std::vector<Action> history;
     int pot = 0;
 };
 
-// Node-walk contract; the solver traverses the game tree via these methods
-// alone. Virtual dispatch is fine at M0 (correctness reference); CRTP/template
-// latitude is open for M1+ if it turns out to be hot — the contract below is
-// what's pinned, not the dispatch mechanism.
 class Game {
 public:
     virtual ~Game() = default;
@@ -36,4 +31,4 @@ public:
     virtual std::vector<std::pair<Action, double>> chance_outcomes(const State& state) const = 0;
 };
 
-}  // namespace cfr::game
+}

@@ -1,12 +1,3 @@
-// bench_eval: hands/sec for cfr::eval's scalar and batch 7-card evaluators.
-//
-// Measures the scalar evaluate_7card loop against evaluate_7card_batch over
-// the same 10^7 pre-generated hands (generation time excluded from both
-// timings). The batch path is a throughput optimization of the write-out
-// only -- see src/eval/eval7.cpp's block comment and STATUS's PERF DEBT
-// entry -- so any batch/scalar gap reported here comes from fewer store
-// instructions, not from vectorized hand evaluation. This bench does not
-// claim "SIMD evaluation" and neither should anyone reading its output.
 
 #include <algorithm>
 #include <array>
@@ -30,9 +21,6 @@ namespace {
 constexpr std::size_t kHandCount = 10'000'000;
 constexpr int kCardsPerHand = 7;
 
-// Fixed seed -- this bench is about steady-state throughput, not about
-// which particular hands got dealt, but a fixed seed keeps runs comparable
-// across machines and across sessions.
 constexpr std::uint64_t kRandomSeed = 0xC5F7BE4C4;
 
 std::array<Card, kCardsPerHand> random_seven_card_hand(std::mt19937_64& rng) {
@@ -60,8 +48,6 @@ std::vector<Card> generate_hand_buffer() {
     return hands;
 }
 
-// CPU model string, for the numbers to mean something outside this machine.
-// popen is fine here -- this is the bench binary, not library code.
 std::string cpu_model() {
     FILE* sysctl_output = popen("sysctl -n machdep.cpu.brand_string", "r");
     if (sysctl_output == nullptr) return "unknown";
@@ -84,7 +70,7 @@ double hands_per_second(std::size_t hand_count, std::chrono::steady_clock::durat
     return static_cast<double>(hand_count) / elapsed_seconds;
 }
 
-}  // namespace
+}
 
 int main() {
     std::printf("CPU: %s\n", cpu_model().c_str());
@@ -97,10 +83,6 @@ int main() {
     std::vector<Card> hands = generate_hand_buffer();
     std::vector<HandRank> ranks(kHandCount);
 
-    // (1) scalar evaluate_7card, called once per hand. The checksum XOR-folds
-    // ranks[hand_index] as it's produced -- a single XOR per hand, inside the
-    // timed region, so the compiler can't prove the loop's results go unused
-    // and DCE the whole thing out from under the timer.
     std::uint64_t scalar_checksum = 0;
     auto scalar_start = std::chrono::steady_clock::now();
     for (std::size_t hand_index = 0; hand_index < kHandCount; ++hand_index) {
@@ -109,14 +91,10 @@ int main() {
     }
     auto scalar_elapsed = std::chrono::steady_clock::now() - scalar_start;
 
-    // (2) evaluate_7card_batch, one call over the whole buffer.
     auto batch_start = std::chrono::steady_clock::now();
     evaluate_7card_batch(hands.data(), kHandCount, ranks.data());
     auto batch_elapsed = std::chrono::steady_clock::now() - batch_start;
 
-    // Batch's timed region is the single call above; folding its output into
-    // a checksum happens after batch_elapsed is captured, so it can't distort
-    // the timing window, but still forces the compiler to keep the writes.
     std::uint64_t batch_checksum = 0;
     for (std::size_t hand_index = 0; hand_index < kHandCount; ++hand_index) {
         batch_checksum ^= ranks[hand_index];

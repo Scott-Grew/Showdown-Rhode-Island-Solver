@@ -25,7 +25,7 @@ std::string action_name(Action action) {
     return "?";
 }
 
-}  // namespace
+}
 
 std::vector<Action> KuhnGame::betting_history(const State& state) {
     return std::vector<Action>(state.history.begin() + 2, state.history.end());
@@ -47,7 +47,7 @@ bool KuhnGame::is_terminal(const State& state) const {
     std::vector<Action> betting = betting_history(state);
     if (betting.size() < 2) return false;
     if (betting.size() == 2) return !(betting[0] == kActionCheck && betting[1] == kActionBet);
-    return true;  // size 3: check, bet, call/fold — always terminal
+    return true;
 }
 
 Player KuhnGame::current_player(const State& state) const {
@@ -55,7 +55,7 @@ Player KuhnGame::current_player(const State& state) const {
     std::vector<Action> betting = betting_history(state);
     if (betting.empty()) return 0;
     if (betting.size() == 1) return 1;
-    return 0;  // size 2: check, bet — player 0 faces the bet
+    return 0;
 }
 
 std::vector<Action> KuhnGame::legal_actions(const State& state) const {
@@ -65,7 +65,7 @@ std::vector<Action> KuhnGame::legal_actions(const State& state) const {
         if (betting[0] == kActionCheck) return {kActionCheck, kActionBet};
         return {kActionCall, kActionFold};
     }
-    return {kActionCall, kActionFold};  // size 2: check, bet — facing the bet
+    return {kActionCall, kActionFold};
 }
 
 State KuhnGame::apply_action(const State& state, Action action) const {
@@ -77,7 +77,7 @@ State KuhnGame::apply_action(const State& state, Action action) const {
             next.private_cards[1] = action;
         }
         next.history.push_back(action);
-        next.pot += 1;  // ante paid on the deal
+        next.pot += 1;
         return next;
     }
 
@@ -99,14 +99,13 @@ double KuhnGame::player0_utility(const State& state) {
         if (betting[0] == kActionBet && betting[1] == kActionCall) {
             return player0_has_higher_card ? 2.0 : -2.0;
         }
-        return 1.0;  // bet, fold — player 0 bet, player 1 folded
+        return 1.0;
     }
 
-    // size 3: check, bet, call/fold — player 1 bet after player 0's check
     if (betting[2] == kActionCall) {
         return player0_has_higher_card ? 2.0 : -2.0;
     }
-    return -1.0;  // player 0 folded to player 1's bet
+    return -1.0;
 }
 
 double KuhnGame::terminal_utility(const State& state, Player player) const {
@@ -133,7 +132,7 @@ std::vector<std::pair<Action, double>> KuhnGame::chance_outcomes(const State& st
         }
         return outcomes;
     }
-    // second deal: exclude player 0's card, remaining 2 cards equally likely
+
     for (int card = 0; card < kKuhnDeckSize; ++card) {
         if (card != state.private_cards[0]) {
             outcomes.emplace_back(card, 1.0 / (kKuhnDeckSize - 1));
@@ -142,4 +141,4 @@ std::vector<std::pair<Action, double>> KuhnGame::chance_outcomes(const State& st
     return outcomes;
 }
 
-}  // namespace cfr::game
+}

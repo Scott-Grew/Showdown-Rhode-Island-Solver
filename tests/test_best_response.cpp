@@ -13,13 +13,6 @@ using namespace cfr::solver;
 
 namespace {
 
-// Test-only verification instruments (obviously-correct recursive walks,
-// deliberately kept out of src/solver -- these exist to check the
-// production best-response code against, not to be reused by it).
-
-// Uniform profile: every infoset reachable in the tree gets equal
-// probability over its legal actions. Doubles as a fixed baseline opponent
-// strategy and as the starting point for the hand-built alternatives below.
 StrategyProfile uniform_profile(const Game& game) {
     StrategyProfile profile;
     walk(game, game.initial_state(), [&](const State& state) {
@@ -32,10 +25,6 @@ StrategyProfile uniform_profile(const Game& game) {
     return profile;
 }
 
-// Overwrites `player`'s entries in a copy of `profile` so every one of
-// their infosets deterministically plays a single fixed legal action:
-// index 0 (first) if use_last_action is false, the last legal action
-// otherwise. The other player's entries are left untouched.
 StrategyProfile pure_action_profile(const Game& game, Player player, bool use_last_action, StrategyProfile profile) {
     walk(game, game.initial_state(), [&](const State& state) {
         if (game.is_terminal(state) || game.is_chance(state)) return;
@@ -48,11 +37,6 @@ StrategyProfile pure_action_profile(const Game& game, Player player, bool use_la
     return profile;
 }
 
-// Expected value for `player` under a full joint profile -- one map
-// covering both players' infosets, exactly like best_response_value's
-// opponent_strategy argument -- via plain policy evaluation (no best
-// response). Missing infosets fall back to uniform, mirroring
-// best_response_value's documented convention so the two are comparable.
 double expected_value(const Game& game, const StrategyProfile& profile, Player player, const State& state) {
     if (game.is_terminal(state)) return game.terminal_utility(state, player);
 
@@ -79,17 +63,17 @@ double expected_value(const Game& game, const StrategyProfile& profile, Player p
     return expected_value(game, profile, player, game.initial_state());
 }
 
-}  // namespace
+}
 
-TEST_CASE("exploitability of uniform-random Kuhn profile is large and positive") {  // V13
+TEST_CASE("V13: exploitability of uniform-random Kuhn profile is large and positive") {
     KuhnGame game;
     StrategyProfile uniform = uniform_profile(game);
     CHECK(exploitability(game, uniform) > 0.1);
 }
 
-TEST_CASE("BR value weakly improves on any fixed alternative strategy") {  // V13
+TEST_CASE("V13: BR value weakly improves on any fixed alternative strategy") {
     KuhnGame game;
-    StrategyProfile opponent = uniform_profile(game);  // fixes both players' baseline strategy
+    StrategyProfile opponent = uniform_profile(game);
     double br_value = best_response_value(game, opponent, 0);
 
     bool any_strict_improvement = false;
@@ -101,7 +85,6 @@ TEST_CASE("BR value weakly improves on any fixed alternative strategy") {  // V1
         if (br_value > alternative_value + 1e-9) any_strict_improvement = true;
     }
 
-    // third hand-built profile: uniform itself (player 0 unchanged from `opponent`)
     double uniform_value = expected_value(game, opponent, 0);
     CHECK(br_value >= uniform_value - 1e-9);
     if (br_value > uniform_value + 1e-9) any_strict_improvement = true;
@@ -109,7 +92,7 @@ TEST_CASE("BR value weakly improves on any fixed alternative strategy") {  // V1
     CHECK(any_strict_improvement);
 }
 
-TEST_CASE("exploitability is symmetric-nonnegative") {  // V13
+TEST_CASE("V13: exploitability is symmetric-nonnegative") {
     KuhnGame game;
     StrategyProfile uniform = uniform_profile(game);
     CHECK(exploitability(game, uniform) >= 0.0);

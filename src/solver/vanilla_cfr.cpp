@@ -7,12 +7,9 @@ namespace cfr::solver {
 
 namespace {
 
-// Strategy-sum entries below this total are treated as "no data yet" and
-// fall back to uniform rather than dividing by (near-)zero -- mirrors
-// regret_matching_strategy's own all-non-positive fallback.
 constexpr double kStrategySumEpsilon = 1e-12;
 
-}  // namespace
+}
 
 VanillaCfr::VanillaCfr(const game::Game& game) : game_(game) {}
 
@@ -37,12 +34,6 @@ std::array<double, 2> VanillaCfr::traverse(const game::State& state, double play
     game::InfoSetKey key = game_.infoset_key(state);
     std::vector<game::Action> actions = game_.legal_actions(state);
 
-    // sigma^t for this infoset: regret-matched against the iteration-start
-    // snapshot, not the live (possibly already-updated-this-iteration) table
-    // -- see class docblock. A key missing from the snapshot (first-ever
-    // visit to this infoset) gets the all-zero regret vector, which
-    // regret_matching_strategy resolves to uniform, same as the live
-    // table's own missing-key behavior.
     auto snapshot_entry = regret_snapshot_.find(key);
     std::vector<double> strategy = snapshot_entry != regret_snapshot_.end()
                                         ? regret_matching_strategy(snapshot_entry->second)
@@ -66,9 +57,6 @@ std::array<double, 2> VanillaCfr::traverse(const game::State& state, double play
         acting_player_action_value[i] = child_value[acting_player];
     }
 
-    // Increments go to the live table, never the snapshot -- the snapshot
-    // stays frozen at its iteration-start values for the rest of this
-    // traversal (see class docblock).
     auto& cumulative_regrets = cumulative_regrets_.try_emplace(key, actions.size(), 0.0).first->second;
     double opponent_reach = acting_player == 0 ? player1_reach : player0_reach;
     double counterfactual_reach = opponent_reach * chance_reach;
@@ -116,4 +104,4 @@ StrategyProfile VanillaCfr::average_strategy() const {
     return profile;
 }
 
-}  // namespace cfr::solver
+}
