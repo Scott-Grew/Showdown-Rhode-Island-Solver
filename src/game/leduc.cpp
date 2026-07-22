@@ -115,6 +115,20 @@ std::string action_name(Action action) {
     return "?";
 }
 
+constexpr int kLeducCardRankCount = 3;
+constexpr int kLeducRoundStageCount = 6;
+constexpr int kLeducRound1EndingCount = 5;
+
+int card_rank(int card) {
+    return card / 2;
+}
+
+int round_progress(const std::vector<Action>& round_actions) {
+    int raises_used = static_cast<int>(std::count(round_actions.begin(), round_actions.end(), kActionRaise));
+    bool opened_with_check = !round_actions.empty() && round_actions.front() == kActionCallCheck;
+    return raises_used * 2 + (opened_with_check ? 1 : 0);
+}
+
 }
 
 State LeducGame::initial_state() const {
@@ -203,7 +217,7 @@ double LeducGame::terminal_utility(const State& state, Player player) const {
                             : -static_cast<double>(contribution[player]);
 }
 
-InfoSetKey LeducGame::infoset_key(const State& state) const {
+InfoSetKey LeducGame::infoset_label(const State& state) const {
     Player player = current_player(state);
     ParsedHistory parsed = parse_history(state);
 
@@ -216,6 +230,33 @@ InfoSetKey LeducGame::infoset_key(const State& state) const {
     key += ";";
     for (Action action : parsed.round2_actions) key += action_name(action) + ",";
     return key;
+}
+
+std::uint32_t LeducGame::infoset_count() const {
+    return static_cast<std::uint32_t>(kLeducRoundStageCount * kLeducCardRankCount +
+                                       kLeducRound1EndingCount * kLeducRoundStageCount * kLeducCardRankCount *
+                                           kLeducCardRankCount);
+}
+
+std::uint32_t LeducGame::infoset_index(const State& state) const {
+    Player player = current_player(state);
+    ParsedHistory parsed = parse_history(state);
+    int private_rank = card_rank(state.private_cards[player]);
+
+    if (!parsed.public_card_dealt) {
+        int round1_stage = round_progress(parsed.round1_actions);
+        return static_cast<std::uint32_t>(round1_stage * kLeducCardRankCount + private_rank);
+    }
+
+    int round1_ending = round_progress(parsed.round1_actions) - 1;
+    int round2_stage = round_progress(parsed.round2_actions);
+    int public_rank = card_rank(state.public_cards[0]);
+
+    int round2_offset =
+        ((round1_ending * kLeducRoundStageCount + round2_stage) * kLeducCardRankCount + private_rank) *
+            kLeducCardRankCount +
+        public_rank;
+    return static_cast<std::uint32_t>(kLeducRoundStageCount * kLeducCardRankCount + round2_offset);
 }
 
 std::vector<std::pair<Action, double>> LeducGame::chance_outcomes(const State& state) const {

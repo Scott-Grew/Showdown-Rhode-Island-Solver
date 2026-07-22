@@ -16,7 +16,7 @@ using BestResponseMemo = std::map<game::InfoSetKey, double>;
 std::vector<double> opponent_action_probabilities(const game::Game& game, const game::State& state,
                                                     const StrategyProfile& opponent_strategy,
                                                     const std::vector<game::Action>& actions) {
-    auto profile_entry = opponent_strategy.find(game.infoset_key(state));
+    auto profile_entry = opponent_strategy.find(game.infoset_label(state));
 
     if (profile_entry != opponent_strategy.end()) {
         assert(profile_entry->second.size() == actions.size());
@@ -43,7 +43,7 @@ void collect_responder_states(const game::Game& game, const game::State& state, 
     std::vector<game::Action> actions = game.legal_actions(state);
 
     if (game.current_player(state) == responder) {
-        states_by_infoset[game.infoset_key(state)].emplace_back(state, reach_weight);
+        states_by_infoset[game.infoset_label(state)].emplace_back(state, reach_weight);
         for (game::Action action : actions) {
             collect_responder_states(game, game.apply_action(state, action), reach_weight, opponent_strategy,
                                       responder, states_by_infoset);
@@ -62,13 +62,13 @@ void collect_responder_states(const game::Game& game, const game::State& state, 
 double node_value(const game::Game& game, const game::State& state, const StrategyProfile& opponent_strategy,
                    game::Player responder, const StatesByInfoset& states_by_infoset, BestResponseMemo& memo);
 
-double best_response_value_at(const game::Game& game, const game::InfoSetKey& infoset_key,
+double best_response_value_at(const game::Game& game, const game::InfoSetKey& infoset_label,
                                const StrategyProfile& opponent_strategy, game::Player responder,
                                const StatesByInfoset& states_by_infoset, BestResponseMemo& memo) {
-    auto memo_entry = memo.find(infoset_key);
+    auto memo_entry = memo.find(infoset_label);
     if (memo_entry != memo.end()) return memo_entry->second;
 
-    const std::vector<std::pair<game::State, double>>& weighted_states = states_by_infoset.at(infoset_key);
+    const std::vector<std::pair<game::State, double>>& weighted_states = states_by_infoset.at(infoset_label);
     std::vector<game::Action> actions = game.legal_actions(weighted_states.front().first);
     std::vector<double> action_totals(actions.size(), 0.0);
     double total_reach_weight = 0.0;
@@ -84,7 +84,7 @@ double best_response_value_at(const game::Game& game, const game::InfoSetKey& in
     double best_value = *std::max_element(action_totals.begin(), action_totals.end());
     double normalized_best_value =
         total_reach_weight > kUnreachableInfosetWeightEpsilon ? best_value / total_reach_weight : 0.0;
-    memo[infoset_key] = normalized_best_value;
+    memo[infoset_label] = normalized_best_value;
     return normalized_best_value;
 }
 
@@ -104,8 +104,8 @@ double node_value(const game::Game& game, const game::State& state, const Strate
     }
 
     if (game.current_player(state) == responder) {
-        return best_response_value_at(game, game.infoset_key(state), opponent_strategy, responder, states_by_infoset,
-                                       memo);
+        return best_response_value_at(game, game.infoset_label(state), opponent_strategy, responder,
+                                       states_by_infoset, memo);
     }
 
     std::vector<game::Action> actions = game.legal_actions(state);
