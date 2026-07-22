@@ -2,6 +2,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <map>
 #include <set>
 #include <tuple>
@@ -84,6 +85,23 @@ TEST_CASE("V6: leduc chance outcome probabilities sum to 1") {
         }
         REQUIRE_THAT(probability_sum, Catch::Matchers::WithinAbs(1.0, 1e-12));
     });
+}
+
+TEST_CASE("V21: leduc infoset index is a bijection onto 0 up to infoset_count") {
+    LeducGame game;
+    std::map<InfoSetKey, std::uint32_t> index_by_label;
+    std::set<std::uint32_t> distinct_indices;
+    walk(game, game.initial_state(), [&](const State& s) {
+        if (game.is_terminal(s) || game.is_chance(s)) return;
+        InfoSetKey label = game.infoset_label(s);
+        std::uint32_t index = game.infoset_index(s);
+        REQUIRE(index < game.infoset_count());
+        auto existing = index_by_label.emplace(label, index).first;
+        REQUIRE(existing->second == index);
+        distinct_indices.insert(index);
+    });
+    REQUIRE(index_by_label.size() == distinct_indices.size());
+    REQUIRE(distinct_indices.size() == game.infoset_count());
 }
 
 TEST_CASE("leduc: raise cap enforced at 2 per round") {
