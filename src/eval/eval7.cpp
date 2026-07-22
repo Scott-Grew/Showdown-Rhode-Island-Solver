@@ -14,9 +14,6 @@ namespace {
 
 constexpr int kCardsPerHand = 7;
 
-// All C(7,5) = 21 ways to choose 5 of 7 card slots, as index quintuples into
-// a 7-card hand -- evaluate_7card's whole job is "try every 5-card subset,
-// keep the best."
 constexpr std::array<std::array<int, 5>, 21> kFiveOfSevenSubsets = {{
     {0, 1, 2, 3, 4}, {0, 1, 2, 3, 5}, {0, 1, 2, 3, 6}, {0, 1, 2, 4, 5}, {0, 1, 2, 4, 6},
     {0, 1, 2, 5, 6}, {0, 1, 3, 4, 5}, {0, 1, 3, 4, 6}, {0, 1, 3, 5, 6}, {0, 1, 4, 5, 6},
@@ -25,7 +22,7 @@ constexpr std::array<std::array<int, 5>, 21> kFiveOfSevenSubsets = {{
     {2, 3, 4, 5, 6},
 }};
 
-}  // namespace
+}
 
 HandRank evaluate_7card(const Card* cards) {
     HandRank best = 0;
@@ -39,13 +36,6 @@ HandRank evaluate_7card(const Card* cards) {
 
 #if defined(__AVX2__) && !defined(CFR_FORCE_SCALAR_BATCH)
 
-// evaluate_7card's per-hand work is a branchy bitmask/histogram computation
-// with no natural data-parallel structure across hands (each hand's control
-// flow depends on its own cards), so vectorizing the evaluation itself isn't
-// a realistic win here. What AVX2 buys cheaply instead is the write-out:
-// hands are scored 16 at a time -- a __m256i holds 16 uint16_t lanes -- into
-// a local aligned buffer, then flushed with one vector store instead of 16
-// scalar writes.
 void evaluate_7card_batch(const Card* hands, std::size_t hand_count, HandRank* ranks_out) {
     constexpr std::size_t kLanesPerBlock = 16;
     alignas(32) HandRank block_buffer[kLanesPerBlock];
@@ -65,10 +55,6 @@ void evaluate_7card_batch(const Card* hands, std::size_t hand_count, HandRank* r
 
 #else
 
-// No AVX2 available: unroll the scalar loop by 8 so the compiler has an
-// independent-iteration window to schedule, without depending on any vector
-// ISA. Produces bit-identical results to the AVX2 path above -- V9 pins that
-// equivalence, not the mechanism.
 void evaluate_7card_batch(const Card* hands, std::size_t hand_count, HandRank* ranks_out) {
     constexpr std::size_t kUnrollFactor = 8;
 
@@ -85,4 +71,4 @@ void evaluate_7card_batch(const Card* hands, std::size_t hand_count, HandRank* r
 
 #endif
 
-}  // namespace cfr::eval
+}

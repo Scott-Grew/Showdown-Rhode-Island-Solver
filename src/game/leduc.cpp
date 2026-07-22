@@ -9,9 +9,6 @@ namespace cfr::game {
 
 namespace {
 
-// A single betting round's actions, split out of the flat history by the
-// chance-event count: 2 private deals precede round 1's actions, and a 3rd
-// chance event (the public card) precedes round 2's.
 struct ParsedHistory {
     std::vector<Action> round1_actions;
     std::vector<Action> round2_actions;
@@ -40,9 +37,6 @@ bool folded(const std::vector<Action>& round_actions) {
     return !round_actions.empty() && round_actions.back() == kActionFold;
 }
 
-// A round closes when the most recent action matches a pending wager (a call)
-// or is the second consecutive check. Folding ends the whole hand rather than
-// just the round, so it's handled separately by callers, not here.
 bool round_closed(const std::vector<Action>& round_actions) {
     if (round_actions.size() < 2) return false;
     if (round_actions.back() != kActionCallCheck) return false;
@@ -50,24 +44,23 @@ bool round_closed(const std::vector<Action>& round_actions) {
     return previous == kActionCallCheck || previous == kActionRaise;
 }
 
-// Heads-up betting alternates strictly within a round; player 0 always opens.
 Player round_actor(const std::vector<Action>& round_actions) {
     return static_cast<Player>(round_actions.size() % 2);
 }
 
 std::vector<Action> round_legal_actions(const std::vector<Action>& round_actions) {
     if (round_actions.empty()) {
-        return {kActionCallCheck, kActionRaise};  // opening action: nothing to fold to yet
+        return {kActionCallCheck, kActionRaise};
     }
     bool facing_wager = round_actions.back() == kActionRaise;
     if (!facing_wager) {
-        return {kActionCallCheck, kActionRaise};  // only reachable after a bare opening check
+        return {kActionCallCheck, kActionRaise};
     }
     int raises_used = static_cast<int>(std::count(round_actions.begin(), round_actions.end(), kActionRaise));
     if (raises_used < kMaxRaisesPerRound) {
         return {kActionFold, kActionCallCheck, kActionRaise};
     }
-    return {kActionFold, kActionCallCheck};  // raise cap hit — must fold or call
+    return {kActionFold, kActionCallCheck};
 }
 
 int bet_size_for_round(bool public_card_dealt) {
@@ -88,7 +81,7 @@ void apply_round_contributions(const std::vector<Action>& round_actions, int bet
 }
 
 std::array<int, 2> contributions(const State& state) {
-    std::array<int, 2> contribution = {1, 1};  // ante
+    std::array<int, 2> contribution = {1, 1};
     ParsedHistory parsed = parse_history(state);
     apply_round_contributions(parsed.round1_actions, kRound1Bet, contribution);
     if (parsed.public_card_dealt) {
@@ -97,8 +90,6 @@ std::array<int, 2> contributions(const State& state) {
     return contribution;
 }
 
-// +1 => player 0's hand wins, -1 => player 1's, 0 => tie (split pot). Pairing
-// with the public card beats any non-pair; otherwise higher rank wins.
 int compare_hands(const State& state) {
     int public_rank = state.public_cards[0] / 2;
     int rank0 = state.private_cards[0] / 2;
@@ -124,7 +115,7 @@ std::string action_name(Action action) {
     return "?";
 }
 
-}  // namespace
+}
 
 State LeducGame::initial_state() const {
     State state;
@@ -167,10 +158,10 @@ State LeducGame::apply_action(const State& state, Action action) const {
         int card = action - kChanceCardOffset;
         if (state.private_cards[0] == -1) {
             next.private_cards[0] = card;
-            next.pot += 1;  // ante
+            next.pot += 1;
         } else if (state.private_cards[1] == -1) {
             next.private_cards[1] = card;
-            next.pot += 1;  // ante
+            next.pot += 1;
         } else {
             next.public_cards.push_back(card);
         }
@@ -206,7 +197,7 @@ double LeducGame::terminal_utility(const State& state, Player player) const {
     }
 
     int showdown_result = compare_hands(state);
-    if (showdown_result == 0) return 0.0;  // tie: split pot, utility 0 each
+    if (showdown_result == 0) return 0.0;
     Player winner = showdown_result > 0 ? 0 : 1;
     return player == winner ? static_cast<double>(pot - contribution[winner])
                             : -static_cast<double>(contribution[player]);
@@ -242,4 +233,4 @@ std::vector<std::pair<Action, double>> LeducGame::chance_outcomes(const State& s
     return outcomes;
 }
 
-}  // namespace cfr::game
+}

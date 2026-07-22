@@ -4,7 +4,6 @@
 
 namespace cfr::game {
 
-// tree_walk.hpp — exhaustive DFS; f runs at every state.
 template <typename Fn>
 void walk(const Game& game, const State& state, Fn&& visit) {
     visit(state);
@@ -18,4 +17,4 @@ void walk(const Game& game, const State& state, Fn&& visit) {
         walk(game, game.apply_action(state, action), visit);
 }
 
-}  // namespace cfr::game
+}

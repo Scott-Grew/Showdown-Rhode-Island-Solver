@@ -34,4 +34,4 @@ void accumulate_regret_plus(std::vector<double>& cumulative_regrets, const std::
     }
 }
 
-}  // namespace cfr::solver
+}

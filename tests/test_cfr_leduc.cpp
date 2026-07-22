@@ -12,7 +12,7 @@
 using namespace cfr::game;
 using namespace cfr::solver;
 
-TEST_CASE("leduc cfr+: deterministic — two runs identical") {   // V20
+TEST_CASE("V20: leduc cfr+ deterministic — two runs identical") {
     LeducGame game;
     CfrPlus solver_a(game);
     solver_a.run_iterations(1000);
@@ -21,7 +21,7 @@ TEST_CASE("leduc cfr+: deterministic — two runs identical") {   // V20
     REQUIRE(solver_a.average_strategy() == solver_b.average_strategy());
 }
 
-TEST_CASE("leduc cfr+: exploitability decreases across decade checkpoints") {  // V18
+TEST_CASE("V18: leduc cfr+ exploitability decreases across decade checkpoints") {
     LeducGame game;
     CfrPlus solver(game);
 
@@ -37,7 +37,7 @@ TEST_CASE("leduc cfr+: exploitability decreases across decade checkpoints") {  /
     }
 }
 
-TEST_CASE("leduc: cfr+ exploitability <= vanilla cfr at matched checkpoints") {  // V17
+TEST_CASE("V17: leduc cfr+ exploitability <= vanilla cfr at matched checkpoints") {
     LeducGame game;
     CfrPlus cfr_plus_solver(game);
     VanillaCfr vanilla_solver(game);

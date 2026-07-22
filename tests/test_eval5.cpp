@@ -19,10 +19,8 @@ using cfr::eval::HandRank;
 using cfr::eval::naive::naive_evaluate_5card;
 using cfr::eval::naive::NaiveRank;
 
-TEST_CASE("eval5: wheel (A-2-3-4-5) ranks below a 6-high straight, not above it") {  // V4 edge case
-    // Ace-low straights are the classic evaluator bug: an implementation that
-    // forgets the special case treats the ace as high and misranks the wheel
-    // as the strongest straight instead of the weakest.
+TEST_CASE("V4: eval5 wheel (A-2-3-4-5) ranks below a 6-high straight, not above it") {
+
     std::array<Card, 5> wheel = {make_card(12, 0), make_card(0, 1), make_card(1, 2), make_card(2, 3), make_card(3, 0)};
     std::array<Card, 5> six_high = {make_card(1, 0), make_card(2, 1), make_card(3, 2), make_card(4, 3), make_card(5, 0)};
     std::array<Card, 5> broadway = {make_card(8, 0), make_card(9, 1), make_card(10, 2), make_card(11, 3), make_card(12, 1)};
@@ -37,8 +35,8 @@ TEST_CASE("eval5: wheel (A-2-3-4-5) ranks below a 6-high straight, not above it"
     REQUIRE(naive_evaluate_5card(six_high.data()) < naive_evaluate_5card(broadway.data()));
 }
 
-TEST_CASE("eval5: fast path matches naive reference ordering over all C(52,5) hands", "[slow]") {  // V4
-    constexpr std::size_t kExpectedHandCount = 2'598'960;  // C(52,5)
+TEST_CASE("V4: eval5 fast path matches naive reference ordering over all C(52,5) hands", "[slow]") {
+    constexpr std::size_t kExpectedHandCount = 2'598'960;
 
     std::vector<HandRank> fast_ranks;
     std::vector<NaiveRank> naive_ranks;
@@ -63,12 +61,6 @@ TEST_CASE("eval5: fast path matches naive reference ordering over all C(52,5) ha
 
     REQUIRE(fast_ranks.size() == kExpectedHandCount);
 
-    // Order-agreement check: sort hand indices by the fast path's rank, then
-    // walk the sorted order once. Equal-fast-rank neighbors must be
-    // equal-naive-rank (same tie class); different-fast-rank neighbors must
-    // be strictly increasing in naive rank too. A single adjacent pass
-    // suffices for the whole array by transitivity of < and ==, and avoids
-    // 2.6M individual Catch2 assertions.
     std::vector<std::size_t> order(fast_ranks.size());
     std::iota(order.begin(), order.end(), std::size_t{0});
     std::sort(order.begin(), order.end(),
@@ -89,7 +81,7 @@ TEST_CASE("eval5: fast path matches naive reference ordering over all C(52,5) ha
     REQUIRE(first_mismatch == order.size());
 }
 
-TEST_CASE("eval5: fast path matches naive reference ordering over 10^6 random pairs") {  // V4 spot-check
+TEST_CASE("V4: eval5 fast path matches naive reference ordering over 10^6 random pairs") {
     std::mt19937_64 rng(0xC5F0'0D5EED);
     std::uniform_int_distribution<int> card_distribution(0, kCardCount - 1);
 
