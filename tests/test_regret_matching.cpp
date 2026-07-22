@@ -37,3 +37,14 @@ TEST_CASE("regret matching: output sums to 1") {                    // V10
         CHECK(probability_sum == Catch::Approx(1.0));
     }
 }
+
+TEST_CASE("regret matching+: floors cumulative regret at zero every update") {  // V16
+    std::vector<double> cumulative_regrets = {2.0, -1.0};
+    accumulate_regret_plus(cumulative_regrets, {-5.0, -0.5});
+    CHECK(cumulative_regrets[0] == Catch::Approx(0.0));  // 2.0 - 5.0 = -3.0 -> floored
+    CHECK(cumulative_regrets[1] == Catch::Approx(0.0));  // -1.0 - 0.5 = -1.5 -> floored
+
+    accumulate_regret_plus(cumulative_regrets, {3.0, 0.2});
+    CHECK(cumulative_regrets[0] == Catch::Approx(3.0));  // 0 + 3.0, no floor triggered
+    CHECK(cumulative_regrets[1] == Catch::Approx(0.2));  // 0 + 0.2, no floor triggered
+}
