@@ -74,11 +74,7 @@ double hands_per_second(std::size_t hand_count, std::chrono::steady_clock::durat
 
 int main() {
     std::printf("CPU: %s\n", cpu_model().c_str());
-#if defined(__AVX2__) && !defined(CFR_FORCE_SCALAR_BATCH)
-    std::printf("evaluate_7card_batch: AVX2 write-out path compiled in\n");
-#else
-    std::printf("evaluate_7card_batch: scalar fallback path compiled in (no AVX2)\n");
-#endif
+    std::printf("evaluate_7card: 21-subset scalar reference, no vectorized path\n");
 
     std::vector<Card> hands = generate_hand_buffer();
     std::vector<HandRank> ranks(kHandCount);

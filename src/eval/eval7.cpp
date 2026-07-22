@@ -4,10 +4,6 @@
 #include <array>
 #include <cstddef>
 
-#if defined(__AVX2__) && !defined(CFR_FORCE_SCALAR_BATCH)
-#include <immintrin.h>
-#endif
-
 namespace cfr::eval {
 
 namespace {
@@ -34,41 +30,10 @@ HandRank evaluate_7card(const Card* cards) {
     return best;
 }
 
-#if defined(__AVX2__) && !defined(CFR_FORCE_SCALAR_BATCH)
-
 void evaluate_7card_batch(const Card* hands, std::size_t hand_count, HandRank* ranks_out) {
-    constexpr std::size_t kLanesPerBlock = 16;
-    alignas(32) HandRank block_buffer[kLanesPerBlock];
-
-    std::size_t hand_index = 0;
-    for (; hand_index + kLanesPerBlock <= hand_count; hand_index += kLanesPerBlock) {
-        for (std::size_t lane = 0; lane < kLanesPerBlock; ++lane) {
-            block_buffer[lane] = evaluate_7card(hands + (hand_index + lane) * kCardsPerHand);
-        }
-        __m256i scored_lanes = _mm256_load_si256(reinterpret_cast<const __m256i*>(block_buffer));
-        _mm256_storeu_si256(reinterpret_cast<__m256i*>(ranks_out + hand_index), scored_lanes);
-    }
-    for (; hand_index < hand_count; ++hand_index) {
+    for (std::size_t hand_index = 0; hand_index < hand_count; ++hand_index) {
         ranks_out[hand_index] = evaluate_7card(hands + hand_index * kCardsPerHand);
     }
 }
-
-#else
-
-void evaluate_7card_batch(const Card* hands, std::size_t hand_count, HandRank* ranks_out) {
-    constexpr std::size_t kUnrollFactor = 8;
-
-    std::size_t hand_index = 0;
-    for (; hand_index + kUnrollFactor <= hand_count; hand_index += kUnrollFactor) {
-        for (std::size_t lane = 0; lane < kUnrollFactor; ++lane) {
-            ranks_out[hand_index + lane] = evaluate_7card(hands + (hand_index + lane) * kCardsPerHand);
-        }
-    }
-    for (; hand_index < hand_count; ++hand_index) {
-        ranks_out[hand_index] = evaluate_7card(hands + hand_index * kCardsPerHand);
-    }
-}
-
-#endif
 
 }

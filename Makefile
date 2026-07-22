@@ -1,8 +1,7 @@
-.PHONY: build test verify-discovery bench asan test-fallback clean
+.PHONY: build test verify-discovery bench asan clean
 
 RELEASE_DIR := .build/release
 ASAN_DIR := .build/asan
-FALLBACK_DIR := .build/fallback
 
 build:
 	cmake -B $(RELEASE_DIR) -DCMAKE_BUILD_TYPE=Release
@@ -30,11 +29,6 @@ asan:
 	cmake -B $(ASAN_DIR) -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
 	cmake --build $(ASAN_DIR)
 	ctest --test-dir $(ASAN_DIR) --output-on-failure -E "$(SLOW_UNDER_SANITIZERS)"
-
-test-fallback:
-	cmake -B $(FALLBACK_DIR) -DCMAKE_BUILD_TYPE=Release -DCFR_DISABLE_AVX2=ON
-	cmake --build $(FALLBACK_DIR)
-	ctest --test-dir $(FALLBACK_DIR) --output-on-failure
 
 clean:
 	rm -rf .build .deps

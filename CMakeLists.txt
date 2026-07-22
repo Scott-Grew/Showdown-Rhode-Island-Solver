@@ -7,23 +7,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_compile_options(-Wall -Wextra -Werror)
 
-# eval7's batch path takes an AVX2 fast path when the compiler can target it
-# (Intel Mac, most x86-64 CI runners); it falls back to unrolled scalar code
-# otherwise (see src/eval/eval7.cpp). Detected rather than assumed so a
-# non-x86 build never gets a hard compile failure over it.
-#
-# CFR_DISABLE_AVX2 forces the fallback branch even on AVX2-capable hardware --
-# without it the non-AVX2 half of eval7.cpp only ever got compiled by
-# whichever machine happened to lack -mavx2, i.e. never repeatably. ON: skip
-# -mavx2 and define CFR_FORCE_SCALAR_BATCH so eval7.cpp's #if takes the
-# scalar branch regardless of what the compiler could target.
-option(CFR_DISABLE_AVX2 "Force the non-AVX2 scalar batch path, regardless of compiler capability" OFF)
-
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag(-mavx2 CFR_HAS_AVX2_FLAG)
-if(CFR_DISABLE_AVX2)
-    add_compile_definitions(CFR_FORCE_SCALAR_BATCH)
-elseif(CFR_HAS_AVX2_FLAG)
+if(CFR_HAS_AVX2_FLAG)
     add_compile_options(-mavx2)
 endif()
 
