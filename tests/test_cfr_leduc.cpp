@@ -10,8 +10,7 @@
 
 #include "game/leduc.hpp"
 #include "solver/best_response.hpp"
-#include "solver/cfr_plus.hpp"
-#include "solver/vanilla_cfr.hpp"
+#include "solver/cfr_solver.hpp"
 
 using namespace cfr::game;
 using namespace cfr::solver;

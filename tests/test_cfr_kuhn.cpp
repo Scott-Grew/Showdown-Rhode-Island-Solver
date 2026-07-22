@@ -8,7 +8,7 @@
 #include "game/kuhn.hpp"
 #include "solver/best_response.hpp"
 #include "solver/strategy.hpp"
-#include "solver/vanilla_cfr.hpp"
+#include "solver/cfr_solver.hpp"
 
 using namespace cfr::game;
 using namespace cfr::solver;
