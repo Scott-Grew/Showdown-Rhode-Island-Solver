@@ -39,7 +39,8 @@ TEST_CASE("V2: kuhn infoset key hides opponent card") {
         if (game.is_terminal(s) || game.is_chance(s)) return;
         int player = game.current_player(s);
         int own_card = s.private_cards[player];
-        std::vector<int> betting(s.history.begin() + 2, s.history.end());
+        std::vector<int> betting;
+        for (std::uint8_t index = 2; index < s.history_len; ++index) betting.push_back(s.history[index]);
         keys_by_group[{player, own_card, betting}].insert(game.infoset_label(s));
     });
 

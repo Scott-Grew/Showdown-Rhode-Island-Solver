@@ -1,7 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <bit>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -90,7 +92,8 @@ struct VanillaRules {
 
     static bool updates(int, game::Player) { return true; }
 
-    static void accumulate(std::vector<double>& cumulative_regrets, const std::vector<double>& increments) {
+    template <typename IncrementRange>
+    static void accumulate(std::vector<double>& cumulative_regrets, const IncrementRange& increments) {
         for (std::size_t i = 0; i < cumulative_regrets.size(); ++i) {
             cumulative_regrets[i] += increments[i];
         }
@@ -104,7 +107,8 @@ struct CfrPlusRules {
 
     static bool updates(int iteration, game::Player acting_player) { return acting_player == iteration % 2; }
 
-    static void accumulate(std::vector<double>& cumulative_regrets, const std::vector<double>& increments) {
+    template <typename IncrementRange>
+    static void accumulate(std::vector<double>& cumulative_regrets, const IncrementRange& increments) {
         accumulate_regret_plus(cumulative_regrets, increments);
     }
 
@@ -166,16 +170,19 @@ std::array<double, 2> CfrSolver<Rules>::traverse(const game::State& state, doubl
     game::Player acting_player = game_.current_player(state);
     std::uint32_t infoset_index = game_.infoset_index(state);
     std::vector<game::Action> actions = game_.legal_actions(state);
+    assert(actions.size() <= detail::kMaxActionsPerInfoset);
 
     const std::vector<double>& regret_snapshot = regret_snapshot_[infoset_index];
-    std::vector<double> strategy = !regret_snapshot.empty()
-                                        ? regret_matching_strategy(regret_snapshot)
-                                        : regret_matching_strategy(std::vector<double>(actions.size(), 0.0));
+    std::vector<double> regret_matched_strategy = !regret_snapshot.empty()
+                                                       ? regret_matching_strategy(regret_snapshot)
+                                                       : regret_matching_strategy(std::vector<double>(actions.size(), 0.0));
+    std::array<double, detail::kMaxActionsPerInfoset> strategy{};
+    for (std::size_t i = 0; i < actions.size(); ++i) strategy[i] = regret_matched_strategy[i];
 
     double acting_player_reach = acting_player == 0 ? player0_reach : player1_reach;
 
     std::array<double, 2> node_value = {0.0, 0.0};
-    std::vector<double> acting_player_action_value(actions.size());
+    std::array<double, detail::kMaxActionsPerInfoset> acting_player_action_value{};
     for (std::size_t i = 0; i < actions.size(); ++i) {
         double next_player0_reach = acting_player == 0 ? player0_reach * strategy[i] : player0_reach;
         double next_player1_reach = acting_player == 1 ? player1_reach * strategy[i] : player1_reach;
@@ -189,7 +196,7 @@ std::array<double, 2> CfrSolver<Rules>::traverse(const game::State& state, doubl
     if (Rules::updates(iteration_, acting_player)) {
         double opponent_reach = acting_player == 0 ? player1_reach : player0_reach;
         double counterfactual_reach = opponent_reach * chance_reach;
-        std::vector<double> increment(actions.size());
+        std::array<double, detail::kMaxActionsPerInfoset> increment{};
         for (std::size_t i = 0; i < actions.size(); ++i) {
             increment[i] = counterfactual_reach * (acting_player_action_value[i] - node_value[acting_player]);
         }

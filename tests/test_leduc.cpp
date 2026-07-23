@@ -42,12 +42,13 @@ TEST_CASE("V2: leduc infoset key hides opponent card") {
         if (game.is_terminal(s) || game.is_chance(s)) return;
         int player = game.current_player(s);
         int own_card = s.private_cards[player];
-        int public_card = s.public_cards.empty() ? -1 : s.public_cards[0];
+        int public_card = s.public_count == 0 ? -1 : s.public_cards[0];
 
         std::vector<Action> round1_betting_actions;
         std::vector<Action> round2_betting_actions;
         int chance_events_seen = 0;
-        for (Action entry : s.history) {
+        for (std::uint8_t index = 0; index < s.history_len; ++index) {
+            Action entry = s.history[index];
             if (entry >= kChanceCardOffset) {
                 ++chance_events_seen;
                 continue;

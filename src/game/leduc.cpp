@@ -18,7 +18,8 @@ struct ParsedHistory {
 ParsedHistory parse_history(const State& state) {
     ParsedHistory parsed;
     int chance_events_seen = 0;
-    for (Action entry : state.history) {
+    for (std::uint8_t index = 0; index < state.history_len; ++index) {
+        Action entry = state.history[index];
         if (entry >= kChanceCardOffset) {
             ++chance_events_seen;
             if (chance_events_seen == 3) parsed.public_card_dealt = true;
@@ -168,7 +169,7 @@ std::vector<Action> LeducGame::legal_actions(const State& state) const {
 State LeducGame::apply_action(const State& state, Action action) const {
     State next = state;
     if (is_chance(state)) {
-        next.history.push_back(action);
+        next.history[next.history_len++] = static_cast<std::uint8_t>(action);
         int card = action - kChanceCardOffset;
         if (state.private_cards[0] == -1) {
             next.private_cards[0] = card;
@@ -177,13 +178,13 @@ State LeducGame::apply_action(const State& state, Action action) const {
             next.private_cards[1] = card;
             next.pot += 1;
         } else {
-            next.public_cards.push_back(card);
+            next.public_cards[next.public_count++] = static_cast<std::int8_t>(card);
         }
         return next;
     }
 
-    next.history.push_back(action);
-    bool public_card_dealt = !state.public_cards.empty();
+    next.history[next.history_len++] = static_cast<std::uint8_t>(action);
+    bool public_card_dealt = state.public_count != 0;
     if (action == kLeducActionRaise) {
         next.pot += bet_size_for_round(public_card_dealt);
     } else if (action == kLeducActionCallCheck) {
@@ -222,7 +223,7 @@ InfoSetKey LeducGame::infoset_label(const State& state) const {
     ParsedHistory parsed = parse_history(state);
 
     std::string key = "P" + std::to_string(player) + ":" + card_name(state.private_cards[player]);
-    if (!state.public_cards.empty()) {
+    if (state.public_count != 0) {
         key += "|" + card_name(state.public_cards[0]);
     }
     key += ":";

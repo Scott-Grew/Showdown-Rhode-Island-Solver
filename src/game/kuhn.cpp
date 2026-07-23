@@ -28,7 +28,11 @@ std::string action_name(Action action) {
 }
 
 std::vector<Action> KuhnGame::betting_history(const State& state) {
-    return std::vector<Action>(state.history.begin() + 2, state.history.end());
+    std::vector<Action> betting;
+    for (std::uint8_t index = 2; index < state.history_len; ++index) {
+        betting.push_back(state.history[index]);
+    }
+    return betting;
 }
 
 State KuhnGame::initial_state() const {
@@ -76,12 +80,12 @@ State KuhnGame::apply_action(const State& state, Action action) const {
         } else {
             next.private_cards[1] = action;
         }
-        next.history.push_back(action);
+        next.history[next.history_len++] = static_cast<std::uint8_t>(action);
         next.pot += 1;
         return next;
     }
 
-    next.history.push_back(action);
+    next.history[next.history_len++] = static_cast<std::uint8_t>(action);
     if (action == kKuhnActionBet || action == kKuhnActionCall) {
         next.pot += 1;
     }
