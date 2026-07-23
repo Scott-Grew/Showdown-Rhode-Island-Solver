@@ -10,9 +10,9 @@ namespace cfr::game {
 
 constexpr int kLeducDeckSize = 6;
 
-constexpr Action kActionFold = 0;
-constexpr Action kActionCallCheck = 1;
-constexpr Action kActionRaise = 2;
+constexpr Action kLeducActionFold = 0;
+constexpr Action kLeducActionCallCheck = 1;
+constexpr Action kLeducActionRaise = 2;
 
 constexpr int kRound1Bet = 2;
 constexpr int kRound2Bet = 4;
@@ -20,7 +20,7 @@ constexpr int kMaxRaisesPerRound = 2;
 
 constexpr Action kChanceCardOffset = 100;
 
-class LeducGame : public Game {
+class LeducGame final : public Game {
 public:
     State initial_state() const override;
     bool is_terminal(const State& state) const override;

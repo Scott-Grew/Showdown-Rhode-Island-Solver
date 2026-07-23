@@ -63,6 +63,7 @@ add_executable(cfr_tests
     tests/test_cfr_kuhn.cpp
     tests/test_cfr_leduc.cpp
     tests/test_fingerprint.cpp
+    tests/test_game_concept.cpp
 )
 target_include_directories(cfr_tests PRIVATE ${CMAKE_SOURCE_DIR}/tests)
 target_link_libraries(cfr_tests PRIVATE cfr_game cfr_eval cfr_eval_naive_ref cfr_solver Catch2::Catch2WithMain)
