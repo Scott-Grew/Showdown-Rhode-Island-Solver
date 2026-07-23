@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <string>
 
+#include "eval/eval3.hpp"
 #include "game/card.hpp"
 #include "game/game_concept.hpp"
 
@@ -106,8 +107,17 @@ std::array<int, 2> contributions(const State& state) {
     return contribution;
 }
 
-double showdown_utility(const State&, Player) {
-    return 0.0;
+double showdown_utility(const State& state, Player player, const std::array<int, 2>& contribution, int pot) {
+    std::array<Card, 3> hand0 = {static_cast<Card>(state.private_cards[0]), static_cast<Card>(state.public_cards[0]),
+                                  static_cast<Card>(state.public_cards[1])};
+    std::array<Card, 3> hand1 = {static_cast<Card>(state.private_cards[1]), static_cast<Card>(state.public_cards[0]),
+                                  static_cast<Card>(state.public_cards[1])};
+    cfr::eval::HandRank rank0 = cfr::eval::evaluate_3card(hand0.data());
+    cfr::eval::HandRank rank1 = cfr::eval::evaluate_3card(hand1.data());
+    if (rank0 == rank1) return 0.0;
+    Player winner = rank0 > rank1 ? 0 : 1;
+    return player == winner ? static_cast<double>(pot - contribution[winner])
+                             : -static_cast<double>(contribution[player]);
 }
 
 std::string card_name(int card) {
@@ -223,7 +233,7 @@ double RhodeIslandGame::terminal_utility(const State& state, Player player) cons
                                  : -static_cast<double>(contribution[folder]);
     }
 
-    return showdown_utility(state, player);
+    return showdown_utility(state, player, contribution, pot);
 }
 
 InfoSetKey RhodeIslandGame::infoset_label(const State& state) const {
