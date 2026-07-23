@@ -13,12 +13,12 @@ constexpr int kKuhnQueen = 1;
 constexpr int kKuhnKing = 2;
 constexpr int kKuhnDeckSize = 3;
 
-constexpr Action kActionCheck = 0;
-constexpr Action kActionBet = 1;
-constexpr Action kActionCall = 2;
-constexpr Action kActionFold = 3;
+constexpr Action kKuhnActionCheck = 0;
+constexpr Action kKuhnActionBet = 1;
+constexpr Action kKuhnActionCall = 2;
+constexpr Action kKuhnActionFold = 3;
 
-class KuhnGame : public Game {
+class KuhnGame final : public Game {
 public:
     State initial_state() const override;
     bool is_terminal(const State& state) const override;

@@ -17,10 +17,10 @@ std::string card_name(int card) {
 
 std::string action_name(Action action) {
     switch (action) {
-        case kActionCheck: return "check";
-        case kActionBet: return "bet";
-        case kActionCall: return "call";
-        case kActionFold: return "fold";
+        case kKuhnActionCheck: return "check";
+        case kKuhnActionBet: return "bet";
+        case kKuhnActionCall: return "call";
+        case kKuhnActionFold: return "fold";
     }
     return "?";
 }
@@ -46,7 +46,7 @@ bool KuhnGame::is_terminal(const State& state) const {
     if (is_chance(state)) return false;
     std::vector<Action> betting = betting_history(state);
     if (betting.size() < 2) return false;
-    if (betting.size() == 2) return !(betting[0] == kActionCheck && betting[1] == kActionBet);
+    if (betting.size() == 2) return !(betting[0] == kKuhnActionCheck && betting[1] == kKuhnActionBet);
     return true;
 }
 
@@ -60,12 +60,12 @@ Player KuhnGame::current_player(const State& state) const {
 
 std::vector<Action> KuhnGame::legal_actions(const State& state) const {
     std::vector<Action> betting = betting_history(state);
-    if (betting.empty()) return {kActionCheck, kActionBet};
+    if (betting.empty()) return {kKuhnActionCheck, kKuhnActionBet};
     if (betting.size() == 1) {
-        if (betting[0] == kActionCheck) return {kActionCheck, kActionBet};
-        return {kActionCall, kActionFold};
+        if (betting[0] == kKuhnActionCheck) return {kKuhnActionCheck, kKuhnActionBet};
+        return {kKuhnActionCall, kKuhnActionFold};
     }
-    return {kActionCall, kActionFold};
+    return {kKuhnActionCall, kKuhnActionFold};
 }
 
 State KuhnGame::apply_action(const State& state, Action action) const {
@@ -82,7 +82,7 @@ State KuhnGame::apply_action(const State& state, Action action) const {
     }
 
     next.history.push_back(action);
-    if (action == kActionBet || action == kActionCall) {
+    if (action == kKuhnActionBet || action == kKuhnActionCall) {
         next.pot += 1;
     }
     return next;
@@ -93,16 +93,16 @@ double KuhnGame::player0_utility(const State& state) {
     bool player0_has_higher_card = state.private_cards[0] > state.private_cards[1];
 
     if (betting.size() == 2) {
-        if (betting[0] == kActionCheck && betting[1] == kActionCheck) {
+        if (betting[0] == kKuhnActionCheck && betting[1] == kKuhnActionCheck) {
             return player0_has_higher_card ? 1.0 : -1.0;
         }
-        if (betting[0] == kActionBet && betting[1] == kActionCall) {
+        if (betting[0] == kKuhnActionBet && betting[1] == kKuhnActionCall) {
             return player0_has_higher_card ? 2.0 : -2.0;
         }
         return 1.0;
     }
 
-    if (betting[2] == kActionCall) {
+    if (betting[2] == kKuhnActionCall) {
         return player0_has_higher_card ? 2.0 : -2.0;
     }
     return -1.0;
@@ -126,7 +126,7 @@ InfoSetKey KuhnGame::infoset_label(const State& state) const {
 
 int KuhnGame::betting_stage(const std::vector<Action>& betting) {
     if (betting.empty()) return 0;
-    if (betting.size() == 1) return betting[0] == kActionCheck ? 1 : 2;
+    if (betting.size() == 1) return betting[0] == kKuhnActionCheck ? 1 : 2;
     return 3;
 }
 

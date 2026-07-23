@@ -34,14 +34,14 @@ ParsedHistory parse_history(const State& state) {
 }
 
 bool folded(const std::vector<Action>& round_actions) {
-    return !round_actions.empty() && round_actions.back() == kActionFold;
+    return !round_actions.empty() && round_actions.back() == kLeducActionFold;
 }
 
 bool round_closed(const std::vector<Action>& round_actions) {
     if (round_actions.size() < 2) return false;
-    if (round_actions.back() != kActionCallCheck) return false;
+    if (round_actions.back() != kLeducActionCallCheck) return false;
     Action previous = round_actions[round_actions.size() - 2];
-    return previous == kActionCallCheck || previous == kActionRaise;
+    return previous == kLeducActionCallCheck || previous == kLeducActionRaise;
 }
 
 Player round_actor(const std::vector<Action>& round_actions) {
@@ -50,17 +50,17 @@ Player round_actor(const std::vector<Action>& round_actions) {
 
 std::vector<Action> round_legal_actions(const std::vector<Action>& round_actions) {
     if (round_actions.empty()) {
-        return {kActionCallCheck, kActionRaise};
+        return {kLeducActionCallCheck, kLeducActionRaise};
     }
-    bool facing_wager = round_actions.back() == kActionRaise;
+    bool facing_wager = round_actions.back() == kLeducActionRaise;
     if (!facing_wager) {
-        return {kActionCallCheck, kActionRaise};
+        return {kLeducActionCallCheck, kLeducActionRaise};
     }
-    int raises_used = static_cast<int>(std::count(round_actions.begin(), round_actions.end(), kActionRaise));
+    int raises_used = static_cast<int>(std::count(round_actions.begin(), round_actions.end(), kLeducActionRaise));
     if (raises_used < kMaxRaisesPerRound) {
-        return {kActionFold, kActionCallCheck, kActionRaise};
+        return {kLeducActionFold, kLeducActionCallCheck, kLeducActionRaise};
     }
-    return {kActionFold, kActionCallCheck};
+    return {kLeducActionFold, kLeducActionCallCheck};
 }
 
 int bet_size_for_round(bool public_card_dealt) {
@@ -72,9 +72,9 @@ void apply_round_contributions(const std::vector<Action>& round_actions, int bet
     for (std::size_t i = 0; i < round_actions.size(); ++i) {
         Player actor = static_cast<Player>(i % 2);
         Action action = round_actions[i];
-        if (action == kActionRaise) {
+        if (action == kLeducActionRaise) {
             contribution[actor] += bet_size;
-        } else if (action == kActionCallCheck && i > 0 && round_actions[i - 1] == kActionRaise) {
+        } else if (action == kLeducActionCallCheck && i > 0 && round_actions[i - 1] == kLeducActionRaise) {
             contribution[actor] += bet_size;
         }
     }
@@ -108,9 +108,9 @@ std::string card_name(int card) {
 
 std::string action_name(Action action) {
     switch (action) {
-        case kActionFold: return "fold";
-        case kActionCallCheck: return "call";
-        case kActionRaise: return "raise";
+        case kLeducActionFold: return "fold";
+        case kLeducActionCallCheck: return "call";
+        case kLeducActionRaise: return "raise";
     }
     return "?";
 }
@@ -124,8 +124,8 @@ int card_rank(int card) {
 }
 
 int round_progress(const std::vector<Action>& round_actions) {
-    int raises_used = static_cast<int>(std::count(round_actions.begin(), round_actions.end(), kActionRaise));
-    bool opened_with_check = !round_actions.empty() && round_actions.front() == kActionCallCheck;
+    int raises_used = static_cast<int>(std::count(round_actions.begin(), round_actions.end(), kLeducActionRaise));
+    bool opened_with_check = !round_actions.empty() && round_actions.front() == kLeducActionCallCheck;
     return raises_used * 2 + (opened_with_check ? 1 : 0);
 }
 
@@ -184,12 +184,12 @@ State LeducGame::apply_action(const State& state, Action action) const {
 
     next.history.push_back(action);
     bool public_card_dealt = !state.public_cards.empty();
-    if (action == kActionRaise) {
+    if (action == kLeducActionRaise) {
         next.pot += bet_size_for_round(public_card_dealt);
-    } else if (action == kActionCallCheck) {
+    } else if (action == kLeducActionCallCheck) {
         ParsedHistory parsed = parse_history(state);
         const std::vector<Action>& active_round = public_card_dealt ? parsed.round2_actions : parsed.round1_actions;
-        if (!active_round.empty() && active_round.back() == kActionRaise) {
+        if (!active_round.empty() && active_round.back() == kLeducActionRaise) {
             next.pot += bet_size_for_round(public_card_dealt);
         }
     }

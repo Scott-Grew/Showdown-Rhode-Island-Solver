@@ -109,15 +109,15 @@ TEST_CASE("leduc: raise cap enforced at 2 per round") {
     State state = game.initial_state();
     state = game.apply_action(state, kChanceCardOffset + 0);
     state = game.apply_action(state, kChanceCardOffset + 2);
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionRaise);
-    state = game.apply_action(state, kActionRaise);
+    state = game.apply_action(state, kLeducActionCallCheck);
+    state = game.apply_action(state, kLeducActionRaise);
+    state = game.apply_action(state, kLeducActionRaise);
 
     REQUIRE_FALSE(game.is_terminal(state));
     std::vector<Action> legal = game.legal_actions(state);
-    REQUIRE(std::find(legal.begin(), legal.end(), kActionRaise) == legal.end());
-    REQUIRE(std::find(legal.begin(), legal.end(), kActionFold) != legal.end());
-    REQUIRE(std::find(legal.begin(), legal.end(), kActionCallCheck) != legal.end());
+    REQUIRE(std::find(legal.begin(), legal.end(), kLeducActionRaise) == legal.end());
+    REQUIRE(std::find(legal.begin(), legal.end(), kLeducActionFold) != legal.end());
+    REQUIRE(std::find(legal.begin(), legal.end(), kLeducActionCallCheck) != legal.end());
 }
 
 TEST_CASE("leduc: split pot pays 0 to both players") {
@@ -126,12 +126,12 @@ TEST_CASE("leduc: split pot pays 0 to both players") {
 
     state = game.apply_action(state, kChanceCardOffset + 2);
     state = game.apply_action(state, kChanceCardOffset + 3);
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kLeducActionCallCheck);
+    state = game.apply_action(state, kLeducActionCallCheck);
     REQUIRE(game.is_chance(state));
     state = game.apply_action(state, kChanceCardOffset + 4);
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kLeducActionCallCheck);
+    state = game.apply_action(state, kLeducActionCallCheck);
 
     REQUIRE(game.is_terminal(state));
     REQUIRE(game.terminal_utility(state, 0) == 0.0);
@@ -144,11 +144,11 @@ TEST_CASE("leduc: round 2 bet doubles round 1's size") {
 
     state = game.apply_action(state, kChanceCardOffset + 4);
     state = game.apply_action(state, kChanceCardOffset + 0);
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kLeducActionCallCheck);
+    state = game.apply_action(state, kLeducActionCallCheck);
     state = game.apply_action(state, kChanceCardOffset + 2);
-    state = game.apply_action(state, kActionRaise);
-    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kLeducActionRaise);
+    state = game.apply_action(state, kLeducActionCallCheck);
 
     REQUIRE(game.is_terminal(state));
 

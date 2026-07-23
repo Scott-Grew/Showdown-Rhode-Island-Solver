@@ -90,8 +90,8 @@ TEST_CASE("kuhn: J bets, K calls -> J loses 2") {
     State state = game.initial_state();
     state = game.apply_action(state, kKuhnJack);
     state = game.apply_action(state, kKuhnKing);
-    state = game.apply_action(state, kActionBet);
-    state = game.apply_action(state, kActionCall);
+    state = game.apply_action(state, kKuhnActionBet);
+    state = game.apply_action(state, kKuhnActionCall);
     REQUIRE(game.is_terminal(state));
     REQUIRE(game.terminal_utility(state, 0) == -2.0);
     REQUIRE(game.terminal_utility(state, 1) == 2.0);
@@ -102,8 +102,8 @@ TEST_CASE("kuhn: bet-fold pays the bettor 1") {
     State state = game.initial_state();
     state = game.apply_action(state, kKuhnQueen);
     state = game.apply_action(state, kKuhnKing);
-    state = game.apply_action(state, kActionBet);
-    state = game.apply_action(state, kActionFold);
+    state = game.apply_action(state, kKuhnActionBet);
+    state = game.apply_action(state, kKuhnActionFold);
     REQUIRE(game.is_terminal(state));
     REQUIRE(game.terminal_utility(state, 0) == 1.0);
     REQUIRE(game.terminal_utility(state, 1) == -1.0);
