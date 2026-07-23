@@ -28,6 +28,7 @@ FetchContent_MakeAvailable(Catch2)
 add_library(cfr_game STATIC
     src/game/kuhn.cpp
     src/game/leduc.cpp
+    src/game/rhode_island.cpp
 )
 target_include_directories(cfr_game PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
@@ -57,6 +58,7 @@ add_executable(cfr_tests
     tests/test_card.cpp
     tests/test_kuhn.cpp
     tests/test_leduc.cpp
+    tests/test_rhode_island.cpp
     tests/test_eval3.cpp
     tests/test_eval5.cpp
     tests/test_eval7.cpp
