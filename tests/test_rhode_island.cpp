@@ -2,12 +2,16 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 #include <vector>
 
+#include "game/card.hpp"
 #include "game/game_concept.hpp"
 #include "game/rhode_island.hpp"
+#include "tree_walk.hpp"
 
+using cfr::make_card;
 using namespace cfr::game;
 
 static_assert(GameLike<RhodeIslandGame>);
@@ -145,4 +149,78 @@ TEST_CASE("rhode island: fold in round 1 pays the raiser the folder's contributi
     REQUIRE(state.pot == 20);
     REQUIRE(game.terminal_utility(state, 0) == -5.0);
     REQUIRE(game.terminal_utility(state, 1) == 5.0);
+}
+
+TEST_CASE("rhode island showdown: straight beats flush at showdown, an RIH-specific inversion") {
+    RhodeIslandGame game;
+    State state = game.initial_state();
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(8, 2));
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(3, 0));
+
+    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(4, 2));
+
+    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(5, 2));
+
+    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kRihActionCallCheck);
+
+    REQUIRE(game.is_terminal(state));
+    REQUIRE(state.pot == 10);
+    REQUIRE(game.terminal_utility(state, 1) == 5.0);
+    REQUIRE(game.terminal_utility(state, 0) == -5.0);
+    REQUIRE(game.terminal_utility(state, 0) + game.terminal_utility(state, 1) == 0.0);
+}
+
+TEST_CASE("rhode island showdown: equal-ranked hands split the pot") {
+    RhodeIslandGame game;
+    State state = game.initial_state();
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(4, 2));
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(4, 3));
+
+    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 0));
+
+    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(8, 1));
+
+    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kRihActionCallCheck);
+
+    REQUIRE(game.is_terminal(state));
+    REQUIRE(game.terminal_utility(state, 0) == 0.0);
+    REQUIRE(game.terminal_utility(state, 1) == 0.0);
+}
+
+TEST_CASE("rhode island V1: zero-sum at every terminal of the fixed-hole-cards subtree") {
+    RhodeIslandGame game;
+    State state = game.initial_state();
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 0));
+
+    long long terminals_visited = 0;
+    walk(game, state, [&](const State& s) {
+        if (!game.is_terminal(s)) return;
+        REQUIRE(game.terminal_utility(s, 0) + game.terminal_utility(s, 1) == 0.0);
+        ++terminals_visited;
+    });
+    REQUIRE(terminals_visited > 0);
+}
+
+TEST_CASE("rhode island V3: legal_actions non-empty at every non-terminal, non-chance state of the fixed-hole-cards "
+          "subtree") {
+    RhodeIslandGame game;
+    State state = game.initial_state();
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 0));
+
+    walk(game, state, [&](const State& s) {
+        if (game.is_terminal(s) || game.is_chance(s)) return;
+        REQUIRE_FALSE(game.legal_actions(s).empty());
+    });
 }
