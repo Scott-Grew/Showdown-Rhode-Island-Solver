@@ -45,14 +45,14 @@ double expected_value(const Game& game, const StrategyProfile& profile, Player p
 
 TEST_CASE("V11: kuhn exploitability < 1e-3 after 1e5 iterations") {
     KuhnGame game;
-    VanillaCfr solver(game);
+    VanillaCfr<cfr::game::KuhnGame> solver(game);
     solver.run_iterations(100000);
     REQUIRE(exploitability(game, solver.average_strategy()) < 1e-3);
 }
 
 TEST_CASE("V12: kuhn game value converges to -1/18") {
     KuhnGame game;
-    VanillaCfr solver(game);
+    VanillaCfr<cfr::game::KuhnGame> solver(game);
     solver.run_iterations(100000);
     CHECK(expected_value(game, solver.average_strategy(), 0) == Catch::Approx(-1.0 / 18.0).margin(1e-3));
 }
@@ -60,10 +60,10 @@ TEST_CASE("V12: kuhn game value converges to -1/18") {
 TEST_CASE("V14: kuhn deterministic — two runs identical") {
     KuhnGame game;
 
-    VanillaCfr solver_a(game);
+    VanillaCfr<cfr::game::KuhnGame> solver_a(game);
     solver_a.run_iterations(10000);
 
-    VanillaCfr solver_b(game);
+    VanillaCfr<cfr::game::KuhnGame> solver_b(game);
     solver_b.run_iterations(10000);
 
     REQUIRE(solver_a.average_strategy() == solver_b.average_strategy());
@@ -71,7 +71,7 @@ TEST_CASE("V14: kuhn deterministic — two runs identical") {
 
 TEST_CASE("V15: kuhn analytic structure of equilibrium") {
     KuhnGame game;
-    VanillaCfr solver(game);
+    VanillaCfr<cfr::game::KuhnGame> solver(game);
     solver.run_iterations(100000);
     StrategyProfile average = solver.average_strategy();
 
@@ -92,7 +92,7 @@ TEST_CASE("V15: kuhn analytic structure of equilibrium") {
 TEST_CASE("V11: kuhn exploitability decreases across decade checkpoints") {
 
     KuhnGame game;
-    VanillaCfr solver(game);
+    VanillaCfr<cfr::game::KuhnGame> solver(game);
 
     std::vector<int> checkpoint_iterations = {100, 1000, 10000, 100000};
     double previous_exploitability = std::numeric_limits<double>::infinity();

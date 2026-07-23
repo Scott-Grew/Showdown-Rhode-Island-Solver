@@ -36,8 +36,8 @@ void dump_solver(std::ostream& out, const cfr::game::LeducGame& game, const char
 std::string leduc_fingerprint() {
     cfr::game::LeducGame game;
     std::ostringstream out;
-    dump_solver<cfr::solver::VanillaCfr>(out, game, "vanilla");
-    dump_solver<cfr::solver::CfrPlus>(out, game, "cfr_plus");
+    dump_solver<cfr::solver::VanillaCfr<cfr::game::LeducGame>>(out, game, "vanilla");
+    dump_solver<cfr::solver::CfrPlus<cfr::game::LeducGame>>(out, game, "cfr_plus");
     return out.str();
 }
 
