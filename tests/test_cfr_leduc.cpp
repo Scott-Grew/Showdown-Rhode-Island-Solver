@@ -19,16 +19,16 @@ using namespace cfr::solver;
 
 TEST_CASE("V20: leduc cfr+ deterministic — two runs identical", "[slow]") {
     LeducGame game;
-    CfrPlus solver_a(game);
+    CfrPlus<cfr::game::LeducGame> solver_a(game);
     solver_a.run_iterations(1000);
-    CfrPlus solver_b(game);
+    CfrPlus<cfr::game::LeducGame> solver_b(game);
     solver_b.run_iterations(1000);
     REQUIRE(solver_a.average_strategy() == solver_b.average_strategy());
 }
 
 TEST_CASE("V18: leduc cfr+ exploitability decreases across decade checkpoints", "[slow]") {
     LeducGame game;
-    CfrPlus solver(game);
+    CfrPlus<cfr::game::LeducGame> solver(game);
 
     std::vector<int> checkpoint_iterations = {100, 1000, 3000, 10000};
     double previous_exploitability = std::numeric_limits<double>::infinity();
@@ -44,8 +44,8 @@ TEST_CASE("V18: leduc cfr+ exploitability decreases across decade checkpoints", 
 
 TEST_CASE("V17: leduc cfr+ exploitability <= vanilla cfr at matched checkpoints", "[slow]") {
     LeducGame game;
-    CfrPlus cfr_plus_solver(game);
-    VanillaCfr vanilla_solver(game);
+    CfrPlus<cfr::game::LeducGame> cfr_plus_solver(game);
+    VanillaCfr<cfr::game::LeducGame> vanilla_solver(game);
 
     std::vector<int> checkpoint_iterations = {100, 1000, 3000, 10000};
     int iterations_run = 0;
@@ -64,16 +64,16 @@ TEST_CASE("V17: leduc cfr+ exploitability <= vanilla cfr at matched checkpoints"
 TEST_CASE("V19: leduc cfr+ checkpoint round-trip is byte-identical to direct run", "[slow]") {
     LeducGame game;
 
-    CfrPlus direct_solver(game);
+    CfrPlus<cfr::game::LeducGame> direct_solver(game);
     direct_solver.run_iterations(1000);
     StrategyProfile direct_strategy = direct_solver.average_strategy();
 
-    CfrPlus first_half_solver(game);
+    CfrPlus<cfr::game::LeducGame> first_half_solver(game);
     first_half_solver.run_iterations(500);
     const std::string checkpoint_path = "test_checkpoint_leduc_cfr_plus.tmp";
     first_half_solver.save_checkpoint(checkpoint_path);
 
-    CfrPlus resumed_solver = CfrPlus::load_checkpoint(game, checkpoint_path);
+    CfrPlus<cfr::game::LeducGame> resumed_solver = CfrPlus<cfr::game::LeducGame>::load_checkpoint(game, checkpoint_path);
     resumed_solver.run_iterations(500);
     std::remove(checkpoint_path.c_str());
 
@@ -83,7 +83,7 @@ TEST_CASE("V19: leduc cfr+ checkpoint round-trip is byte-identical to direct run
 
 TEST_CASE("V19: leduc cfr+ rejects checkpoint from a mismatched game") {
     LeducGame game;
-    CfrPlus solver(game);
+    CfrPlus<cfr::game::LeducGame> solver(game);
     solver.run_iterations(10);
 
     const std::string checkpoint_path = "test_checkpoint_leduc_cfr_plus_mismatched.tmp";
@@ -109,13 +109,13 @@ TEST_CASE("V19: leduc cfr+ rejects checkpoint from a mismatched game") {
     }
     checkpoint_output.close();
 
-    REQUIRE_THROWS_AS(CfrPlus::load_checkpoint(game, checkpoint_path), std::runtime_error);
+    REQUIRE_THROWS_AS(CfrPlus<cfr::game::LeducGame>::load_checkpoint(game, checkpoint_path), std::runtime_error);
     std::remove(checkpoint_path.c_str());
 }
 
 TEST_CASE("V22: leduc cfr+ rejects a truncated checkpoint") {
     LeducGame game;
-    CfrPlus solver(game);
+    CfrPlus<cfr::game::LeducGame> solver(game);
     solver.run_iterations(10);
 
     const std::string checkpoint_path = "test_checkpoint_leduc_truncated.tmp";
@@ -129,43 +129,43 @@ TEST_CASE("V22: leduc cfr+ rejects a truncated checkpoint") {
     truncated_output << contents.substr(0, contents.size() * 2 / 3);
     truncated_output.close();
 
-    REQUIRE_THROWS_AS(CfrPlus::load_checkpoint(game, checkpoint_path), std::runtime_error);
+    REQUIRE_THROWS_AS(CfrPlus<cfr::game::LeducGame>::load_checkpoint(game, checkpoint_path), std::runtime_error);
     std::remove(checkpoint_path.c_str());
 }
 
 TEST_CASE("V23: leduc rejects a checkpoint written by the other solver policy") {
     LeducGame game;
-    VanillaCfr vanilla_solver(game);
+    VanillaCfr<cfr::game::LeducGame> vanilla_solver(game);
     vanilla_solver.run_iterations(10);
 
     const std::string checkpoint_path = "test_checkpoint_leduc_vanilla_policy.tmp";
     vanilla_solver.save_checkpoint(checkpoint_path);
 
-    REQUIRE_THROWS_AS(CfrPlus::load_checkpoint(game, checkpoint_path), std::runtime_error);
-    REQUIRE_NOTHROW(VanillaCfr::load_checkpoint(game, checkpoint_path));
+    REQUIRE_THROWS_AS(CfrPlus<cfr::game::LeducGame>::load_checkpoint(game, checkpoint_path), std::runtime_error);
+    REQUIRE_NOTHROW(VanillaCfr<cfr::game::LeducGame>::load_checkpoint(game, checkpoint_path));
     std::remove(checkpoint_path.c_str());
 }
 
 TEST_CASE("V25: leduc solvers exercise every path at sanitizer-affordable iteration counts") {
     LeducGame game;
 
-    VanillaCfr vanilla_solver(game);
+    VanillaCfr<cfr::game::LeducGame> vanilla_solver(game);
     vanilla_solver.run_iterations(25);
     REQUIRE(exploitability(game, vanilla_solver.average_strategy()) >= 0.0);
     REQUIRE(!vanilla_solver.current_strategy().empty());
 
-    CfrPlus cfr_plus_solver(game);
+    CfrPlus<cfr::game::LeducGame> cfr_plus_solver(game);
     cfr_plus_solver.run_iterations(25);
     StrategyProfile direct_strategy = cfr_plus_solver.average_strategy();
     REQUIRE(exploitability(game, direct_strategy) >= 0.0);
     REQUIRE(!cfr_plus_solver.current_strategy().empty());
 
-    CfrPlus first_half_solver(game);
+    CfrPlus<cfr::game::LeducGame> first_half_solver(game);
     first_half_solver.run_iterations(12);
     const std::string checkpoint_path = "test_checkpoint_leduc_smoke.tmp";
     first_half_solver.save_checkpoint(checkpoint_path);
 
-    CfrPlus resumed_solver = CfrPlus::load_checkpoint(game, checkpoint_path);
+    CfrPlus<cfr::game::LeducGame> resumed_solver = CfrPlus<cfr::game::LeducGame>::load_checkpoint(game, checkpoint_path);
     resumed_solver.run_iterations(13);
     std::remove(checkpoint_path.c_str());
 

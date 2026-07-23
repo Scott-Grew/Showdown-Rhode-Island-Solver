@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "game/game.hpp"
+#include "game/game_concept.hpp"
 #include "solver/strategy.hpp"
 
 namespace cfr::solver {
@@ -115,10 +116,11 @@ struct CfrPlusRules {
     static double weight(int iteration) { return static_cast<double>(iteration); }
 };
 
-template <typename Rules>
+template <typename Rules, typename GameT>
+requires game::GameLike<GameT>
 class CfrSolver {
 public:
-    explicit CfrSolver(const game::Game& game);
+    explicit CfrSolver(const GameT& game);
 
     void run_iterations(int iteration_count);
 
@@ -128,30 +130,32 @@ public:
     int iterations_run() const;
 
     void save_checkpoint(const std::string& path) const;
-    static CfrSolver load_checkpoint(const game::Game& game, const std::string& path);
+    static CfrSolver load_checkpoint(const GameT& game, const std::string& path);
 
 private:
 
     std::array<double, 2> traverse(const game::State& state, double player0_reach, double player1_reach,
                                     double chance_reach);
 
-    const game::Game& game_;
+    const GameT& game_;
     std::vector<std::vector<double>> cumulative_regrets_;
     std::vector<std::vector<double>> regret_snapshot_;
     std::vector<std::vector<double>> strategy_sums_;
     int iteration_ = 0;
 };
 
-template <typename Rules>
-CfrSolver<Rules>::CfrSolver(const game::Game& game)
+template <typename Rules, typename GameT>
+requires game::GameLike<GameT>
+CfrSolver<Rules, GameT>::CfrSolver(const GameT& game)
     : game_(game),
       cumulative_regrets_(game.infoset_count()),
       regret_snapshot_(game.infoset_count()),
       strategy_sums_(game.infoset_count()) {}
 
-template <typename Rules>
-std::array<double, 2> CfrSolver<Rules>::traverse(const game::State& state, double player0_reach, double player1_reach,
-                                                   double chance_reach) {
+template <typename Rules, typename GameT>
+requires game::GameLike<GameT>
+std::array<double, 2> CfrSolver<Rules, GameT>::traverse(const game::State& state, double player0_reach,
+                                                          double player1_reach, double chance_reach) {
     if (game_.is_terminal(state)) {
         return {game_.terminal_utility(state, 0), game_.terminal_utility(state, 1)};
     }
@@ -216,8 +220,9 @@ std::array<double, 2> CfrSolver<Rules>::traverse(const game::State& state, doubl
     return node_value;
 }
 
-template <typename Rules>
-void CfrSolver<Rules>::run_iterations(int iteration_count) {
+template <typename Rules, typename GameT>
+requires game::GameLike<GameT>
+void CfrSolver<Rules, GameT>::run_iterations(int iteration_count) {
     for (int i = 0; i < iteration_count; ++i) {
         ++iteration_;
         regret_snapshot_ = cumulative_regrets_;
@@ -225,16 +230,18 @@ void CfrSolver<Rules>::run_iterations(int iteration_count) {
     }
 }
 
-template <typename Rules>
-StrategyProfile CfrSolver<Rules>::current_strategy() const {
+template <typename Rules, typename GameT>
+requires game::GameLike<GameT>
+StrategyProfile CfrSolver<Rules, GameT>::current_strategy() const {
     StrategyProfile profile;
     detail::collect_strategy_profile(game_, game_.initial_state(), cumulative_regrets_, regret_matching_strategy,
                                       profile);
     return profile;
 }
 
-template <typename Rules>
-StrategyProfile CfrSolver<Rules>::average_strategy() const {
+template <typename Rules, typename GameT>
+requires game::GameLike<GameT>
+StrategyProfile CfrSolver<Rules, GameT>::average_strategy() const {
     StrategyProfile profile;
     detail::collect_strategy_profile(
         game_, game_.initial_state(), strategy_sums_,
@@ -258,13 +265,15 @@ StrategyProfile CfrSolver<Rules>::average_strategy() const {
     return profile;
 }
 
-template <typename Rules>
-int CfrSolver<Rules>::iterations_run() const {
+template <typename Rules, typename GameT>
+requires game::GameLike<GameT>
+int CfrSolver<Rules, GameT>::iterations_run() const {
     return iteration_;
 }
 
-template <typename Rules>
-void CfrSolver<Rules>::save_checkpoint(const std::string& path) const {
+template <typename Rules, typename GameT>
+requires game::GameLike<GameT>
+void CfrSolver<Rules, GameT>::save_checkpoint(const std::string& path) const {
     std::ofstream output(path);
     if (!output) {
         throw std::runtime_error("cfr checkpoint: could not open '" + path + "' for writing");
@@ -280,8 +289,9 @@ void CfrSolver<Rules>::save_checkpoint(const std::string& path) const {
     detail::write_table(output, strategy_sums_);
 }
 
-template <typename Rules>
-CfrSolver<Rules> CfrSolver<Rules>::load_checkpoint(const game::Game& game, const std::string& path) {
+template <typename Rules, typename GameT>
+requires game::GameLike<GameT>
+CfrSolver<Rules, GameT> CfrSolver<Rules, GameT>::load_checkpoint(const GameT& game, const std::string& path) {
     std::ifstream input(path);
     if (!input) {
         throw std::runtime_error("cfr checkpoint: could not open '" + path + "' for reading");
@@ -319,7 +329,7 @@ CfrSolver<Rules> CfrSolver<Rules>::load_checkpoint(const game::Game& game, const
     return solver;
 }
 
-using VanillaCfr = CfrSolver<VanillaRules>;
-using CfrPlus = CfrSolver<CfrPlusRules>;
+template <typename GameT> using VanillaCfr = CfrSolver<VanillaRules, GameT>;
+template <typename GameT> using CfrPlus = CfrSolver<CfrPlusRules, GameT>;
 
 }
