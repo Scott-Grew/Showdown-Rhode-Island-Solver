@@ -40,11 +40,11 @@ TEST_CASE("V10: regret matching output sums to 1") {
 
 TEST_CASE("V16: regret matching+ floors cumulative regret at zero every update") {
     std::vector<double> cumulative_regrets = {2.0, -1.0};
-    accumulate_regret_plus(cumulative_regrets, {-5.0, -0.5});
+    accumulate_regret_plus(cumulative_regrets, std::vector<double>{-5.0, -0.5});
     CHECK(cumulative_regrets[0] == Catch::Approx(0.0));
     CHECK(cumulative_regrets[1] == Catch::Approx(0.0));
 
-    accumulate_regret_plus(cumulative_regrets, {3.0, 0.2});
+    accumulate_regret_plus(cumulative_regrets, std::vector<double>{3.0, 0.2});
     CHECK(cumulative_regrets[0] == Catch::Approx(3.0));
     CHECK(cumulative_regrets[1] == Catch::Approx(0.2));
 }
