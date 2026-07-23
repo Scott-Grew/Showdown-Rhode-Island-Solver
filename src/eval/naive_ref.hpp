@@ -20,5 +20,6 @@ struct NaiveRank {
 };
 
 NaiveRank naive_evaluate_5card(const Card* cards);
+NaiveRank naive_evaluate_3card(const Card* cards);
 
 }
