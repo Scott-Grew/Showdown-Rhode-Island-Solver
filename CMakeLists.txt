@@ -34,8 +34,6 @@ target_include_directories(cfr_game PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 add_library(cfr_eval STATIC
     src/eval/eval3.cpp
-    src/eval/eval5.cpp
-    src/eval/eval7.cpp
 )
 target_include_directories(cfr_eval PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
@@ -60,8 +58,6 @@ add_executable(cfr_tests
     tests/test_leduc.cpp
     tests/test_rhode_island.cpp
     tests/test_eval3.cpp
-    tests/test_eval5.cpp
-    tests/test_eval7.cpp
     tests/test_regret_matching.cpp
     tests/test_best_response.cpp
     tests/test_cfr_kuhn.cpp
@@ -77,5 +73,3 @@ include(CTest)
 include(Catch)
 catch_discover_tests(cfr_tests)
 
-add_executable(cfr_bench bench/bench_eval.cpp)
-target_link_libraries(cfr_bench PRIVATE cfr_game cfr_eval)
