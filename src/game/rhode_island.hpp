@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -24,6 +26,8 @@ constexpr Action kRihChanceCardOffset = 100;
 
 class RhodeIslandGame final : public Game {
 public:
+    static constexpr std::size_t kMaxActions = 3;
+
     State initial_state() const override;
     bool is_terminal(const State& state) const override;
     bool is_chance(const State& state) const override;

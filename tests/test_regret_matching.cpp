@@ -9,7 +9,8 @@
 using namespace cfr::solver;
 
 TEST_CASE("V10: regret matching proportional to positive regrets") {
-    auto strategy = regret_matching_strategy({3.0, 1.0, -2.0});
+    std::vector<double> cumulative_regrets = {3.0, 1.0, -2.0};
+    auto strategy = regret_matching_strategy(cumulative_regrets);
     REQUIRE(strategy.size() == 3);
     CHECK(strategy[0] == Catch::Approx(0.75));
     CHECK(strategy[1] == Catch::Approx(0.25));
@@ -17,7 +18,8 @@ TEST_CASE("V10: regret matching proportional to positive regrets") {
 }
 
 TEST_CASE("V10: regret matching all non-positive -> uniform") {
-    auto strategy = regret_matching_strategy({-1.0, 0.0, -5.0, 0.0});
+    std::vector<double> cumulative_regrets = {-1.0, 0.0, -5.0, 0.0};
+    auto strategy = regret_matching_strategy(cumulative_regrets);
     for (double p : strategy) CHECK(p == Catch::Approx(0.25));
 }
 
