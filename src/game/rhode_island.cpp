@@ -147,8 +147,8 @@ int round_progress(const std::vector<Action>& round_actions) {
 constexpr std::uint32_t kRihRound1IndexSpan = kRihRoundStageCount * kRihDeckSize;
 constexpr std::uint32_t kRihRound2IndexSpan =
     kRihRoundStageCount * kRihRoundStageCount * kRihDeckSize * kRihDeckSize;
-constexpr std::uint32_t kRihRound3IndexSpan =
-    kRihRoundStageCount * kRihRoundStageCount * kRihDeckSize * kRihDeckSize * kRihDeckSize;
+constexpr std::uint32_t kRihRound3IndexSpan = kRihRoundStageCount * kRihRoundStageCount * kRihRoundStageCount *
+                                               kRihDeckSize * kRihDeckSize * kRihDeckSize;
 constexpr std::uint32_t kRihRound2IndexBase = kRihRound1IndexSpan;
 constexpr std::uint32_t kRihRound3IndexBase = kRihRound2IndexBase + kRihRound2IndexSpan;
 
@@ -280,11 +280,14 @@ std::uint32_t RhodeIslandGame::infoset_index(const State& state) const {
         return kRihRound2IndexBase + offset;
     }
 
+    int round1_ending = round_progress(parsed.round1_actions);
     int round2_ending = round_progress(parsed.round2_actions);
     int round3_progress = round_progress(parsed.round3_actions);
     int board_card0 = state.public_cards[0];
     int board_card1 = state.public_cards[1];
-    std::uint32_t offset = (((static_cast<std::uint32_t>(round2_ending) * kRihRoundStageCount +
+    std::uint32_t offset = ((((static_cast<std::uint32_t>(round1_ending) * kRihRoundStageCount +
+                                static_cast<std::uint32_t>(round2_ending)) *
+                                   kRihRoundStageCount +
                                static_cast<std::uint32_t>(round3_progress)) *
                                   kRihDeckSize +
                               static_cast<std::uint32_t>(private_card)) *
