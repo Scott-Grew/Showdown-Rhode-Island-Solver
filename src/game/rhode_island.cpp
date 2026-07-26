@@ -79,23 +79,22 @@ std::vector<Action> round_legal_actions(const std::vector<Action>& round_actions
     return {kRihActionFold, kRihActionCallCheck};
 }
 
-int bet_size_for_round(int board_cards_dealt) {
-    if (board_cards_dealt == 0) return kRihRound1Bet;
-    if (board_cards_dealt == 1) return kRihRound2Bet;
-    return kRihRound3Bet;
-}
-
 void apply_round_contributions(const std::vector<Action>& round_actions, int bet_size,
                                 std::array<int, 2>& contribution) {
+    std::array<int, 2> street_contribution = {0, 0};
+    int level_to_match = 0;
     for (std::size_t i = 0; i < round_actions.size(); ++i) {
         Player actor = static_cast<Player>(i % 2);
         Action action = round_actions[i];
         if (action == kRihActionRaise) {
-            contribution[actor] += bet_size;
-        } else if (action == kRihActionCallCheck && i > 0 && round_actions[i - 1] == kRihActionRaise) {
-            contribution[actor] += bet_size;
+            level_to_match += bet_size;
+            street_contribution[actor] = level_to_match;
+        } else if (action == kRihActionCallCheck) {
+            street_contribution[actor] = level_to_match;
         }
     }
+    contribution[0] += street_contribution[0];
+    contribution[1] += street_contribution[1];
 }
 
 std::array<int, 2> contributions(const State& state) {
@@ -206,16 +205,8 @@ State RhodeIslandGame::apply_action(const State& state, Action action) const {
     }
 
     next.history[next.history_len++] = static_cast<std::uint8_t>(action);
-    ParsedHistory parsed = parse_history(state);
-    int bet_size = bet_size_for_round(parsed.board_cards_dealt);
-    if (action == kRihActionRaise) {
-        next.pot += bet_size;
-    } else if (action == kRihActionCallCheck) {
-        const std::vector<Action>& active_round = active_round_actions(parsed);
-        if (!active_round.empty() && active_round.back() == kRihActionRaise) {
-            next.pot += bet_size;
-        }
-    }
+    std::array<int, 2> contribution = contributions(next);
+    next.pot = contribution[0] + contribution[1];
     return next;
 }
 

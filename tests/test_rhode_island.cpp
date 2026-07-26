@@ -397,3 +397,39 @@ TEST_CASE("rhode island V2: infoset_label and infoset_index hide the opponent's 
     REQUIRE(game.infoset_label(postflop_state) == game.infoset_label(postflop_state_other_opponent_hole));
     REQUIRE(game.infoset_index(postflop_state) == game.infoset_index(postflop_state_other_opponent_hole));
 }
+
+TEST_CASE("V26: rhode island re-raise line pot is exact at every step") {
+    RhodeIslandGame game;
+    State state = game.initial_state();
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(8, 1));
+    REQUIRE(state.pot == 10);
+    state = game.apply_action(state, kRihActionCallCheck);
+    REQUIRE(state.pot == 10);
+    state = game.apply_action(state, kRihActionRaise);
+    REQUIRE(state.pot == 20);
+    state = game.apply_action(state, kRihActionRaise);
+    REQUIRE(state.pot == 40);
+    state = game.apply_action(state, kRihActionCallCheck);
+    REQUIRE(state.pot == 50);
+}
+
+TEST_CASE("V26: rhode island showdown pays exactly half the pot across the fixed-hole subtree") {
+    RhodeIslandGame game;
+    State state = game.initial_state();
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 0));
+
+    long long showdown_terminals = 0;
+    walk(game, state, [&](const State& terminal_candidate) {
+        if (!game.is_terminal(terminal_candidate)) return;
+        if (terminal_candidate.history[terminal_candidate.history_len - 1] == kRihActionFold) return;
+        ++showdown_terminals;
+        REQUIRE(terminal_candidate.pot % 2 == 0);
+        double first_player_utility = game.terminal_utility(terminal_candidate, 0);
+        double half_pot = terminal_candidate.pot / 2.0;
+        REQUIRE((first_player_utility == 0.0 || first_player_utility == half_pot ||
+                 first_player_utility == -half_pot));
+    });
+    REQUIRE(showdown_terminals > 0);
+}

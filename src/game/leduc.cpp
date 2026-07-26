@@ -64,21 +64,22 @@ std::vector<Action> round_legal_actions(const std::vector<Action>& round_actions
     return {kLeducActionFold, kLeducActionCallCheck};
 }
 
-int bet_size_for_round(bool public_card_dealt) {
-    return public_card_dealt ? kRound2Bet : kRound1Bet;
-}
-
 void apply_round_contributions(const std::vector<Action>& round_actions, int bet_size,
                                 std::array<int, 2>& contribution) {
+    std::array<int, 2> street_contribution = {0, 0};
+    int level_to_match = 0;
     for (std::size_t i = 0; i < round_actions.size(); ++i) {
         Player actor = static_cast<Player>(i % 2);
         Action action = round_actions[i];
         if (action == kLeducActionRaise) {
-            contribution[actor] += bet_size;
-        } else if (action == kLeducActionCallCheck && i > 0 && round_actions[i - 1] == kLeducActionRaise) {
-            contribution[actor] += bet_size;
+            level_to_match += bet_size;
+            street_contribution[actor] = level_to_match;
+        } else if (action == kLeducActionCallCheck) {
+            street_contribution[actor] = level_to_match;
         }
     }
+    contribution[0] += street_contribution[0];
+    contribution[1] += street_contribution[1];
 }
 
 std::array<int, 2> contributions(const State& state) {
@@ -184,16 +185,8 @@ State LeducGame::apply_action(const State& state, Action action) const {
     }
 
     next.history[next.history_len++] = static_cast<std::uint8_t>(action);
-    bool public_card_dealt = state.public_count != 0;
-    if (action == kLeducActionRaise) {
-        next.pot += bet_size_for_round(public_card_dealt);
-    } else if (action == kLeducActionCallCheck) {
-        ParsedHistory parsed = parse_history(state);
-        const std::vector<Action>& active_round = public_card_dealt ? parsed.round2_actions : parsed.round1_actions;
-        if (!active_round.empty() && active_round.back() == kLeducActionRaise) {
-            next.pot += bet_size_for_round(public_card_dealt);
-        }
-    }
+    std::array<int, 2> contribution = contributions(next);
+    next.pot = contribution[0] + contribution[1];
     return next;
 }
 
