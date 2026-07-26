@@ -1,6 +1,7 @@
 #pragma once
 
 #include <concepts>
+#include <cstddef>
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -22,6 +23,7 @@ concept GameLike = requires(const CandidateGame game, const State state, Action 
     { game.infoset_index(state) } -> std::same_as<std::uint32_t>;
     { game.infoset_count() } -> std::same_as<std::uint32_t>;
     { game.chance_outcomes(state) } -> std::same_as<std::vector<std::pair<Action, double>>>;
+    { CandidateGame::kMaxActions } -> std::convertible_to<std::size_t>;
 };
 
 }

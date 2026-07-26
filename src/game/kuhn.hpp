@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -20,6 +22,8 @@ constexpr Action kKuhnActionFold = 3;
 
 class KuhnGame final : public Game {
 public:
+    static constexpr std::size_t kMaxActions = 2;
+
     State initial_state() const override;
     bool is_terminal(const State& state) const override;
     bool is_chance(const State& state) const override;

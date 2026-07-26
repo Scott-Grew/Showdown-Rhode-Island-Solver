@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <fstream>
 #include <numeric>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -21,35 +22,22 @@ namespace cfr::solver {
 namespace detail {
 
 inline constexpr double kStrategySumEpsilon = 1e-12;
-inline constexpr char kCheckpointHeader[] = "CFR_CHECKPOINT_V2";
+inline constexpr char kCheckpointHeader[] = "CFR_CHECKPOINT_V3";
 inline constexpr std::size_t kMaxActionsPerInfoset = 64;
 
-inline void write_table(std::ostream& output, const std::vector<std::vector<double>>& table) {
-    for (const std::vector<double>& infoset_values : table) {
-        output << infoset_values.size();
-        for (double value : infoset_values) {
-            output << ' ' << std::hex << std::bit_cast<std::uint64_t>(value) << std::dec;
-        }
-        output << '\n';
+inline void write_table(std::ostream& output, const std::vector<double>& table) {
+    for (double value : table) {
+        output << std::hex << std::bit_cast<std::uint64_t>(value) << std::dec << '\n';
     }
 }
 
-inline std::vector<std::vector<double>> read_table(std::istream& input, std::uint32_t infoset_count) {
-    std::vector<std::vector<double>> table(infoset_count);
-    for (std::uint32_t infoset_index = 0; infoset_index < infoset_count; ++infoset_index) {
-        std::size_t action_count;
-        input >> action_count;
-        if (!input) throw std::runtime_error("cfr checkpoint: truncated before infoset row");
-        if (action_count > kMaxActionsPerInfoset) {
-            throw std::runtime_error("cfr checkpoint: implausible action count " + std::to_string(action_count));
-        }
-        table[infoset_index].resize(action_count);
-        for (std::size_t action_index = 0; action_index < action_count; ++action_index) {
-            std::uint64_t bits;
-            input >> std::hex >> bits >> std::dec;
-            if (!input) throw std::runtime_error("cfr checkpoint: truncated inside infoset row");
-            table[infoset_index][action_index] = std::bit_cast<double>(bits);
-        }
+inline std::vector<double> read_table(std::istream& input, std::size_t value_count) {
+    std::vector<double> table(value_count);
+    for (std::size_t i = 0; i < value_count; ++i) {
+        std::uint64_t bits;
+        input >> std::hex >> bits >> std::dec;
+        if (!input) throw std::runtime_error("cfr checkpoint: truncated inside table");
+        table[i] = std::bit_cast<double>(bits);
     }
     return table;
 }
@@ -64,25 +52,25 @@ inline void expect_token(std::istream& input, const std::string& expected) {
 
 template <typename StrategyFromStored>
 void collect_strategy_profile(const game::Game& game, const game::State& state,
-                               const std::vector<std::vector<double>>& stored_table,
+                               const std::vector<double>& stored_table, std::size_t stride,
                                StrategyFromStored&& strategy_from_stored, StrategyProfile& profile) {
     if (game.is_terminal(state)) return;
 
     if (game.is_chance(state)) {
         for (auto& [action, probability] : game.chance_outcomes(state)) {
-            collect_strategy_profile(game, game.apply_action(state, action), stored_table, strategy_from_stored,
-                                      profile);
+            collect_strategy_profile(game, game.apply_action(state, action), stored_table, stride,
+                                      strategy_from_stored, profile);
         }
         return;
     }
 
-    const std::vector<double>& stored = stored_table[game.infoset_index(state)];
-    if (!stored.empty()) {
-        profile[game.infoset_label(state)] = strategy_from_stored(stored);
-    }
+    std::vector<game::Action> actions = game.legal_actions(state);
+    std::span<const double> stored(stored_table.data() + game.infoset_index(state) * stride, actions.size());
+    profile[game.infoset_label(state)] = strategy_from_stored(stored);
 
-    for (game::Action action : game.legal_actions(state)) {
-        collect_strategy_profile(game, game.apply_action(state, action), stored_table, strategy_from_stored, profile);
+    for (game::Action action : actions) {
+        collect_strategy_profile(game, game.apply_action(state, action), stored_table, stride, strategy_from_stored,
+                                  profile);
     }
 }
 
@@ -93,8 +81,7 @@ struct VanillaRules {
 
     static bool updates(int, game::Player) { return true; }
 
-    template <typename IncrementRange>
-    static void accumulate(std::vector<double>& cumulative_regrets, const IncrementRange& increments) {
+    static void accumulate(std::span<double> cumulative_regrets, std::span<const double> increments) {
         for (std::size_t i = 0; i < cumulative_regrets.size(); ++i) {
             cumulative_regrets[i] += increments[i];
         }
@@ -108,8 +95,7 @@ struct CfrPlusRules {
 
     static bool updates(int iteration, game::Player acting_player) { return acting_player == iteration % 2; }
 
-    template <typename IncrementRange>
-    static void accumulate(std::vector<double>& cumulative_regrets, const IncrementRange& increments) {
+    static void accumulate(std::span<double> cumulative_regrets, std::span<const double> increments) {
         accumulate_regret_plus(cumulative_regrets, increments);
     }
 
@@ -137,10 +123,12 @@ private:
     std::array<double, 2> traverse(const game::State& state, double player0_reach, double player1_reach,
                                     double chance_reach);
 
+    static constexpr std::size_t kStride = GameT::kMaxActions;
+
     const GameT& game_;
-    std::vector<std::vector<double>> cumulative_regrets_;
-    std::vector<std::vector<double>> regret_snapshot_;
-    std::vector<std::vector<double>> strategy_sums_;
+    std::vector<double> cumulative_regrets_;
+    std::vector<double> regret_snapshot_;
+    std::vector<double> strategy_sums_;
     int iteration_ = 0;
 };
 
@@ -148,9 +136,9 @@ template <typename Rules, typename GameT>
 requires game::GameLike<GameT>
 CfrSolver<Rules, GameT>::CfrSolver(const GameT& game)
     : game_(game),
-      cumulative_regrets_(game.infoset_count()),
-      regret_snapshot_(game.infoset_count()),
-      strategy_sums_(game.infoset_count()) {}
+      cumulative_regrets_(static_cast<std::size_t>(game.infoset_count()) * kStride, 0.0),
+      regret_snapshot_(static_cast<std::size_t>(game.infoset_count()) * kStride, 0.0),
+      strategy_sums_(static_cast<std::size_t>(game.infoset_count()) * kStride, 0.0) {}
 
 template <typename Rules, typename GameT>
 requires game::GameLike<GameT>
@@ -176,12 +164,10 @@ std::array<double, 2> CfrSolver<Rules, GameT>::traverse(const game::State& state
     std::vector<game::Action> actions = game_.legal_actions(state);
     assert(actions.size() <= detail::kMaxActionsPerInfoset);
 
-    const std::vector<double>& regret_snapshot = regret_snapshot_[infoset_index];
-    std::vector<double> regret_matched_strategy = !regret_snapshot.empty()
-                                                       ? regret_matching_strategy(regret_snapshot)
-                                                       : regret_matching_strategy(std::vector<double>(actions.size(), 0.0));
+    std::size_t table_offset = static_cast<std::size_t>(infoset_index) * kStride;
     std::array<double, detail::kMaxActionsPerInfoset> strategy{};
-    for (std::size_t i = 0; i < actions.size(); ++i) strategy[i] = regret_matched_strategy[i];
+    regret_matching_strategy_into(std::span<const double>(regret_snapshot_.data() + table_offset, actions.size()),
+                                   std::span<double>(strategy.data(), actions.size()));
 
     double acting_player_reach = acting_player == 0 ? player0_reach : player1_reach;
 
@@ -205,12 +191,10 @@ std::array<double, 2> CfrSolver<Rules, GameT>::traverse(const game::State& state
             increment[i] = counterfactual_reach * (acting_player_action_value[i] - node_value[acting_player]);
         }
 
-        std::vector<double>& cumulative_regrets = cumulative_regrets_[infoset_index];
-        if (cumulative_regrets.empty()) cumulative_regrets.assign(actions.size(), 0.0);
-        Rules::accumulate(cumulative_regrets, increment);
+        Rules::accumulate(std::span<double>(cumulative_regrets_.data() + table_offset, actions.size()),
+                          std::span<const double>(increment.data(), actions.size()));
 
-        std::vector<double>& strategy_sum = strategy_sums_[infoset_index];
-        if (strategy_sum.empty()) strategy_sum.assign(actions.size(), 0.0);
+        std::span<double> strategy_sum(strategy_sums_.data() + table_offset, actions.size());
         double strategy_weight = Rules::weight(iteration_);
         for (std::size_t i = 0; i < actions.size(); ++i) {
             strategy_sum[i] += strategy_weight * acting_player_reach * strategy[i];
@@ -234,7 +218,8 @@ template <typename Rules, typename GameT>
 requires game::GameLike<GameT>
 StrategyProfile CfrSolver<Rules, GameT>::current_strategy() const {
     StrategyProfile profile;
-    detail::collect_strategy_profile(game_, game_.initial_state(), cumulative_regrets_, regret_matching_strategy,
+    detail::collect_strategy_profile(game_, game_.initial_state(), cumulative_regrets_, kStride,
+                                      [](std::span<const double> stored) { return regret_matching_strategy(stored); },
                                       profile);
     return profile;
 }
@@ -244,8 +229,8 @@ requires game::GameLike<GameT>
 StrategyProfile CfrSolver<Rules, GameT>::average_strategy() const {
     StrategyProfile profile;
     detail::collect_strategy_profile(
-        game_, game_.initial_state(), strategy_sums_,
-        [](const std::vector<double>& strategy_sum) {
+        game_, game_.initial_state(), strategy_sums_, kStride,
+        [](std::span<const double> strategy_sum) {
             double total = std::accumulate(strategy_sum.begin(), strategy_sum.end(), 0.0);
 
             std::vector<double> strategy(strategy_sum.size());
@@ -282,7 +267,7 @@ void CfrSolver<Rules, GameT>::save_checkpoint(const std::string& path) const {
     output << detail::kCheckpointHeader << '\n';
     output << "policy " << Rules::kPolicyName << '\n';
     output << "iteration " << iteration_ << '\n';
-    output << "infoset_count " << cumulative_regrets_.size() << '\n';
+    output << "infoset_count " << game_.infoset_count() << '\n';
     output << "regrets\n";
     detail::write_table(output, cumulative_regrets_);
     output << "strategy_sums\n";
@@ -316,11 +301,13 @@ CfrSolver<Rules, GameT> CfrSolver<Rules, GameT>::load_checkpoint(const GameT& ga
                                   std::to_string(game.infoset_count()) + ")");
     }
 
+    std::size_t value_count = static_cast<std::size_t>(infoset_count) * kStride;
+
     detail::expect_token(input, "regrets");
-    std::vector<std::vector<double>> cumulative_regrets = detail::read_table(input, infoset_count);
+    std::vector<double> cumulative_regrets = detail::read_table(input, value_count);
 
     detail::expect_token(input, "strategy_sums");
-    std::vector<std::vector<double>> strategy_sums = detail::read_table(input, infoset_count);
+    std::vector<double> strategy_sums = detail::read_table(input, value_count);
 
     CfrSolver solver(game);
     solver.iteration_ = iteration;
