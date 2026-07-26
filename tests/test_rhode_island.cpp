@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -15,6 +16,120 @@ using cfr::make_card;
 using namespace cfr::game;
 
 static_assert(GameLike<RhodeIslandGame>);
+
+namespace {
+
+struct BettingRoundTopology {
+    long long node_count;
+    long long closing_leaf_count;
+};
+
+BettingRoundTopology enumerate_betting_round_topology(int raises_used, bool facing_wager, bool is_round_start,
+                                                        int max_raises_per_round) {
+    long long node_count = 1;
+    long long closing_leaf_count = 0;
+
+    if (!facing_wager) {
+        if (is_round_start) {
+            BettingRoundTopology check_subtree =
+                enumerate_betting_round_topology(raises_used, false, false, max_raises_per_round);
+            node_count += check_subtree.node_count;
+            closing_leaf_count += check_subtree.closing_leaf_count;
+        } else {
+            node_count += 1;
+            closing_leaf_count += 1;
+        }
+        BettingRoundTopology bet_subtree =
+            enumerate_betting_round_topology(raises_used + 1, true, false, max_raises_per_round);
+        node_count += bet_subtree.node_count;
+        closing_leaf_count += bet_subtree.closing_leaf_count;
+    } else {
+        node_count += 1;
+        node_count += 1;
+        closing_leaf_count += 1;
+        if (raises_used < max_raises_per_round) {
+            BettingRoundTopology raise_subtree =
+                enumerate_betting_round_topology(raises_used + 1, true, false, max_raises_per_round);
+            node_count += raise_subtree.node_count;
+            closing_leaf_count += raise_subtree.closing_leaf_count;
+        }
+    }
+    return {node_count, closing_leaf_count};
+}
+
+long long composed_three_round_betting_node_count(int max_raises_per_round) {
+    BettingRoundTopology round1_topology = enumerate_betting_round_topology(0, false, true, max_raises_per_round);
+    BettingRoundTopology round2_topology = enumerate_betting_round_topology(0, false, true, max_raises_per_round);
+    BettingRoundTopology round3_topology = enumerate_betting_round_topology(0, false, true, max_raises_per_round);
+    return round1_topology.node_count +
+           round1_topology.closing_leaf_count *
+               (round2_topology.node_count + round2_topology.closing_leaf_count * round3_topology.node_count);
+}
+
+constexpr long long kRihOrderedHoleAssignmentCount = 52 * 51;
+constexpr long long kRihFlopOutcomeCount = 50;
+constexpr long long kRihTurnOutcomeCount = 49;
+
+long long full_game_node_count(int max_raises_per_round) {
+    BettingRoundTopology round_topology = enumerate_betting_round_topology(0, false, true, max_raises_per_round);
+    long long nodes_per_hole_assignment =
+        round_topology.node_count +
+        round_topology.closing_leaf_count * kRihFlopOutcomeCount *
+            (round_topology.node_count +
+             round_topology.closing_leaf_count * kRihTurnOutcomeCount * round_topology.node_count);
+    return kRihOrderedHoleAssignmentCount * nodes_per_hole_assignment;
+}
+
+long long count_fixed_card_engine_nodes(const RhodeIslandGame& game, const State& state, Action fixed_flop_action,
+                                         Action fixed_turn_action) {
+    long long total = 1;
+    if (game.is_terminal(state)) return total;
+    if (game.is_chance(state)) {
+        Action next_card_action = state.public_count == 0 ? fixed_flop_action : fixed_turn_action;
+        total +=
+            count_fixed_card_engine_nodes(game, game.apply_action(state, next_card_action), fixed_flop_action,
+                                           fixed_turn_action);
+        return total;
+    }
+    for (Action action : game.legal_actions(state)) {
+        total += count_fixed_card_engine_nodes(game, game.apply_action(state, action), fixed_flop_action,
+                                                 fixed_turn_action);
+    }
+    return total;
+}
+
+}
+
+TEST_CASE("RIH betting-subtree node count matches combinatorial formula") {
+    RhodeIslandGame game;
+    State state = game.initial_state();
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 0));
+
+    Action fixed_flop_action = kRihChanceCardOffset + make_card(2, 0);
+    Action fixed_turn_action = kRihChanceCardOffset + make_card(3, 0);
+
+    long long engine_node_count = count_fixed_card_engine_nodes(game, state, fixed_flop_action, fixed_turn_action);
+    long long formula_node_count = composed_three_round_betting_node_count(kRihMaxRaisesPerRound);
+
+    REQUIRE(engine_node_count == formula_node_count);
+}
+
+TEST_CASE("RIH per-round betting topology matches the hand enumeration") {
+    BettingRoundTopology round_topology = enumerate_betting_round_topology(0, false, true, kRihMaxRaisesPerRound);
+    REQUIRE(round_topology.node_count == 21);
+    REQUIRE(round_topology.closing_leaf_count == 7);
+}
+
+TEST_CASE("RIH full-game node count exceeds the published 3.1e9 figure") {
+    long long betting_and_board_nodes = full_game_node_count(kRihMaxRaisesPerRound);
+    long long hole_deal_chance_node_count = 1 + kRihDeckSize;
+    long long full_tree_node_count = hole_deal_chance_node_count + betting_and_board_nodes;
+
+    REQUIRE(betting_and_board_nodes == 6705372492LL);
+    REQUIRE(full_tree_node_count == 6705372545LL);
+    REQUIRE(full_tree_node_count > 3100000000LL);
+}
 
 TEST_CASE("rhode island satisfies GameLike", "[concept]") {
     REQUIRE(GameLike<RhodeIslandGame>);
@@ -223,4 +338,62 @@ TEST_CASE("rhode island V3: legal_actions non-empty at every non-terminal, non-c
         if (game.is_terminal(s) || game.is_chance(s)) return;
         REQUIRE_FALSE(game.legal_actions(s).empty());
     });
+}
+
+TEST_CASE("rhode island: infoset_index is a collision-free bijection with infoset_label over the "
+          "fixed-hole-cards subtree") {
+    RhodeIslandGame game;
+    State state = game.initial_state();
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 0));
+
+    std::unordered_map<InfoSetKey, std::uint32_t> label_to_index;
+    std::unordered_map<std::uint32_t, InfoSetKey> index_to_label;
+    long long infosets_visited = 0;
+    walk(game, state, [&](const State& s) {
+        if (game.is_terminal(s) || game.is_chance(s)) return;
+        InfoSetKey label = game.infoset_label(s);
+        std::uint32_t index = game.infoset_index(s);
+        REQUIRE(index < game.infoset_count());
+
+        auto [label_entry, label_inserted] = label_to_index.emplace(label, index);
+        if (!label_inserted) REQUIRE(label_entry->second == index);
+
+        auto [index_entry, index_inserted] = index_to_label.emplace(index, label);
+        if (!index_inserted) REQUIRE(index_entry->second == label);
+
+        ++infosets_visited;
+    });
+    REQUIRE(infosets_visited > 0);
+}
+
+TEST_CASE("rhode island V2: infoset_label and infoset_index hide the opponent's hole card") {
+    RhodeIslandGame game;
+
+    State preflop_state = game.initial_state();
+    preflop_state = game.apply_action(preflop_state, kRihChanceCardOffset + make_card(0, 0));
+    preflop_state = game.apply_action(preflop_state, kRihChanceCardOffset + make_card(1, 0));
+
+    State preflop_state_other_opponent_hole = game.initial_state();
+    preflop_state_other_opponent_hole =
+        game.apply_action(preflop_state_other_opponent_hole, kRihChanceCardOffset + make_card(0, 0));
+    preflop_state_other_opponent_hole =
+        game.apply_action(preflop_state_other_opponent_hole, kRihChanceCardOffset + make_card(9, 3));
+
+    REQUIRE(game.infoset_label(preflop_state) == game.infoset_label(preflop_state_other_opponent_hole));
+    REQUIRE(game.infoset_index(preflop_state) == game.infoset_index(preflop_state_other_opponent_hole));
+
+    State postflop_state = preflop_state;
+    postflop_state = game.apply_action(postflop_state, kRihActionCallCheck);
+    postflop_state = game.apply_action(postflop_state, kRihActionCallCheck);
+    postflop_state = game.apply_action(postflop_state, kRihChanceCardOffset + make_card(5, 1));
+
+    State postflop_state_other_opponent_hole = preflop_state_other_opponent_hole;
+    postflop_state_other_opponent_hole = game.apply_action(postflop_state_other_opponent_hole, kRihActionCallCheck);
+    postflop_state_other_opponent_hole = game.apply_action(postflop_state_other_opponent_hole, kRihActionCallCheck);
+    postflop_state_other_opponent_hole =
+        game.apply_action(postflop_state_other_opponent_hole, kRihChanceCardOffset + make_card(5, 1));
+
+    REQUIRE(game.infoset_label(postflop_state) == game.infoset_label(postflop_state_other_opponent_hole));
+    REQUIRE(game.infoset_index(postflop_state) == game.infoset_index(postflop_state_other_opponent_hole));
 }
