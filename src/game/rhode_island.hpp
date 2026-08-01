@@ -2,7 +2,9 @@
 
 #include <cstddef>
 
+#include <array>
 #include <cstdint>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -23,6 +25,21 @@ constexpr int kRihMaxRaisesPerRound = 3;
 constexpr int kRihAnte = 5;
 
 constexpr Action kRihChanceCardOffset = 100;
+
+struct RihParsedHistory {
+    std::vector<Action> round1_actions;
+    std::vector<Action> round2_actions;
+    std::vector<Action> round3_actions;
+    int board_cards_dealt = 0;
+};
+
+RihParsedHistory rih_parse_history(const State& state);
+
+const std::vector<Action>& rih_active_round_actions(const RihParsedHistory& parsed);
+
+std::array<int, 2> rih_contributions(const State& state);
+
+std::string rih_card_name(int card);
 
 class RhodeIslandGame final : public Game {
 public:

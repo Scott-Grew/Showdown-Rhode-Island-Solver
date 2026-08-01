@@ -48,9 +48,22 @@ target_include_directories(cfr_eval_naive_ref PUBLIC ${CMAKE_SOURCE_DIR}/src)
 add_library(cfr_solver STATIC
     src/solver/strategy.cpp
     src/solver/best_response.cpp
+    src/solver/rih_best_response.cpp
 )
 target_include_directories(cfr_solver PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(cfr_solver PUBLIC cfr_game)
+target_link_libraries(cfr_solver PUBLIC cfr_game cfr_eval)
+
+add_library(cfr_grader STATIC
+    src/grader/gsi_strategy.cpp
+)
+target_include_directories(cfr_grader PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(cfr_grader PUBLIC cfr_game)
+target_compile_definitions(cfr_grader PUBLIC CFR_GSI_DATA_DIR="${CMAKE_SOURCE_DIR}/data/gsi")
+
+add_executable(cfr_play
+    src/demo/play_rih.cpp
+)
+target_link_libraries(cfr_play PRIVATE cfr_game cfr_eval cfr_grader)
 
 add_executable(cfr_tests
     tests/test_card.cpp
@@ -64,9 +77,12 @@ add_executable(cfr_tests
     tests/test_cfr_leduc.cpp
     tests/test_game_concept.cpp
     tests/test_state.cpp
+    tests/test_gsi_strategy.cpp
+    tests/test_gsi_grader.cpp
+    tests/test_mccfr.cpp
 )
 target_include_directories(cfr_tests PRIVATE ${CMAKE_SOURCE_DIR}/tests)
-target_link_libraries(cfr_tests PRIVATE cfr_game cfr_eval cfr_eval_naive_ref cfr_solver Catch2::Catch2WithMain)
+target_link_libraries(cfr_tests PRIVATE cfr_game cfr_eval cfr_eval_naive_ref cfr_solver cfr_grader Catch2::Catch2WithMain)
 
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 include(CTest)
