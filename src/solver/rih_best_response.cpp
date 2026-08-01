@@ -60,13 +60,13 @@ private:
 
     RihCardVector terminal_value(const State& state, const RihCardVector& opponent_reach,
                                   const BoardRanks* ranks) const {
-        RihParsedHistory parsed = rih_parse_history(state);
-        const std::vector<Action>& final_round = rih_active_round_actions(parsed);
+        ParsedRounds parsed = parse_rounds(state);
+        const std::vector<Action>& final_round = active_round_actions(parsed);
         std::array<int, 2> contribution = rih_contributions(state);
         double board_multiplicity = undealt_board_multiplicity(state);
         RihCardVector value{};
 
-        if (!final_round.empty() && final_round.back() == kRihActionFold) {
+        if (!final_round.empty() && final_round.back() == kActionFold) {
             Player folder = static_cast<Player>((final_round.size() - 1) % 2);
             int pot = contribution[0] + contribution[1];
             double payoff = responder_ == 1 - folder ? static_cast<double>(pot - contribution[1 - folder])
@@ -119,7 +119,7 @@ private:
             }
             if (already_public) continue;
 
-            State child = game_.apply_action(state, kRihChanceCardOffset + board_card);
+            State child = game_.apply_action(state, kChanceCardOffset + board_card);
             RihCardVector child_reach = opponent_reach;
             child_reach[static_cast<std::size_t>(board_card)] = 0.0;
 
@@ -143,7 +143,7 @@ private:
         std::vector<Action> actions = game_.legal_actions(state);
         RihCardVector value{};
 
-        RihParsedHistory parsed = rih_parse_history(state);
+        ParsedRounds parsed = parse_rounds(state);
         bool maximize_here = maximize_ && (deviation_round_ < 0 || parsed.board_cards_dealt == deviation_round_);
 
         std::vector<double> probabilities_by_card;
@@ -198,8 +198,8 @@ public:
 double walk_root(const RihStrategyQuery& strategy, Player responder, bool maximize, int deviation_round = -1) {
     RhodeIslandGame game;
     State root = game.initial_state();
-    root = game.apply_action(root, kRihChanceCardOffset + 0);
-    root = game.apply_action(root, kRihChanceCardOffset + 1);
+    root = game.apply_action(root, kChanceCardOffset + 0);
+    root = game.apply_action(root, kChanceCardOffset + 1);
 
     RihCardVector opponent_reach;
     opponent_reach.fill(1.0);

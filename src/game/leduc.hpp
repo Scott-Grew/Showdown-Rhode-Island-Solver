@@ -1,27 +1,22 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
-
 #include <cstdint>
 #include <utility>
 #include <vector>
 
+#include "game/betting_round.hpp"
 #include "game/game.hpp"
 
 namespace cfr::game {
 
 constexpr int kLeducDeckSize = 6;
 
-constexpr Action kLeducActionFold = 0;
-constexpr Action kLeducActionCallCheck = 1;
-constexpr Action kLeducActionRaise = 2;
-
 constexpr int kRound1Bet = 2;
 constexpr int kRound2Bet = 4;
 constexpr int kMaxRaisesPerRound = 2;
 constexpr int kLeducAnte = 1;
-
-constexpr Action kChanceCardOffset = 100;
 
 std::array<int, 2> leduc_contributions(const State& state);
 

@@ -8,34 +8,18 @@
 #include <utility>
 #include <vector>
 
+#include "game/betting_round.hpp"
 #include "game/game.hpp"
 
 namespace cfr::game {
 
 constexpr int kRihDeckSize = 52;
 
-constexpr Action kRihActionFold = 0;
-constexpr Action kRihActionCallCheck = 1;
-constexpr Action kRihActionRaise = 2;
-
 constexpr int kRihRound1Bet = 10;
 constexpr int kRihRound2Bet = 20;
 constexpr int kRihRound3Bet = 20;
 constexpr int kRihMaxRaisesPerRound = 3;
 constexpr int kRihAnte = 5;
-
-constexpr Action kRihChanceCardOffset = 100;
-
-struct RihParsedHistory {
-    std::vector<Action> round1_actions;
-    std::vector<Action> round2_actions;
-    std::vector<Action> round3_actions;
-    int board_cards_dealt = 0;
-};
-
-RihParsedHistory rih_parse_history(const State& state);
-
-const std::vector<Action>& rih_active_round_actions(const RihParsedHistory& parsed);
 
 std::array<int, 2> rih_contributions(const State& state);
 

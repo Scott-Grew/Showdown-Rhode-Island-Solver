@@ -110,15 +110,15 @@ TEST_CASE("leduc: raise cap enforced at 2 per round") {
     State state = game.initial_state();
     state = game.apply_action(state, kChanceCardOffset + 0);
     state = game.apply_action(state, kChanceCardOffset + 2);
-    state = game.apply_action(state, kLeducActionCallCheck);
-    state = game.apply_action(state, kLeducActionRaise);
-    state = game.apply_action(state, kLeducActionRaise);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionRaise);
+    state = game.apply_action(state, kActionRaise);
 
     REQUIRE_FALSE(game.is_terminal(state));
     std::vector<Action> legal = game.legal_actions(state);
-    REQUIRE(std::find(legal.begin(), legal.end(), kLeducActionRaise) == legal.end());
-    REQUIRE(std::find(legal.begin(), legal.end(), kLeducActionFold) != legal.end());
-    REQUIRE(std::find(legal.begin(), legal.end(), kLeducActionCallCheck) != legal.end());
+    REQUIRE(std::find(legal.begin(), legal.end(), kActionRaise) == legal.end());
+    REQUIRE(std::find(legal.begin(), legal.end(), kActionFold) != legal.end());
+    REQUIRE(std::find(legal.begin(), legal.end(), kActionCallCheck) != legal.end());
 }
 
 TEST_CASE("leduc: split pot pays 0 to both players") {
@@ -127,12 +127,12 @@ TEST_CASE("leduc: split pot pays 0 to both players") {
 
     state = game.apply_action(state, kChanceCardOffset + 2);
     state = game.apply_action(state, kChanceCardOffset + 3);
-    state = game.apply_action(state, kLeducActionCallCheck);
-    state = game.apply_action(state, kLeducActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
     REQUIRE(game.is_chance(state));
     state = game.apply_action(state, kChanceCardOffset + 4);
-    state = game.apply_action(state, kLeducActionCallCheck);
-    state = game.apply_action(state, kLeducActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
 
     REQUIRE(game.is_terminal(state));
     REQUIRE(game.terminal_utility(state, 0) == 0.0);
@@ -145,11 +145,11 @@ TEST_CASE("leduc: round 2 bet doubles round 1's size") {
 
     state = game.apply_action(state, kChanceCardOffset + 4);
     state = game.apply_action(state, kChanceCardOffset + 0);
-    state = game.apply_action(state, kLeducActionCallCheck);
-    state = game.apply_action(state, kLeducActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
     state = game.apply_action(state, kChanceCardOffset + 2);
-    state = game.apply_action(state, kLeducActionRaise);
-    state = game.apply_action(state, kLeducActionCallCheck);
+    state = game.apply_action(state, kActionRaise);
+    state = game.apply_action(state, kActionCallCheck);
 
     REQUIRE(game.is_terminal(state));
 
@@ -167,11 +167,11 @@ TEST_CASE("V26: leduc re-raise line pot is exact at every step") {
     state = game.apply_action(state, kChanceCardOffset + 0);
     state = game.apply_action(state, kChanceCardOffset + 2);
     REQUIRE(pot_of(state) == 2);
-    state = game.apply_action(state, kLeducActionRaise);
+    state = game.apply_action(state, kActionRaise);
     REQUIRE(pot_of(state) == 4);
-    state = game.apply_action(state, kLeducActionRaise);
+    state = game.apply_action(state, kActionRaise);
     REQUIRE(pot_of(state) == 8);
-    state = game.apply_action(state, kLeducActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
     REQUIRE(pot_of(state) == 10);
 }
 
@@ -180,7 +180,7 @@ TEST_CASE("V26: leduc showdown pays exactly half the pot — a closed round leav
     long long showdown_terminals = 0;
     walk(game, game.initial_state(), [&](const State& state) {
         if (!game.is_terminal(state)) return;
-        if (state.history[state.history_len - 1] == kLeducActionFold) return;
+        if (state.history[state.history_len - 1] == kActionFold) return;
         ++showdown_terminals;
         std::array<int, 2> contribution = leduc_contributions(state);
         REQUIRE(contribution[0] == contribution[1]);
