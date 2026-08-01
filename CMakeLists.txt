@@ -65,6 +65,11 @@ add_executable(cfr_play
 )
 target_link_libraries(cfr_play PRIVATE cfr_game cfr_eval cfr_grader)
 
+add_executable(cfr_measure
+    src/measure/rih_exploitability.cpp
+)
+target_link_libraries(cfr_measure PRIVATE cfr_game cfr_eval cfr_solver)
+
 add_executable(cfr_tests
     tests/test_card.cpp
     tests/test_kuhn.cpp
