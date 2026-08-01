@@ -15,7 +15,8 @@ using namespace cfr::solver;
 
 namespace {
 
-double expected_value(const Game& game, const StrategyProfile& profile, Player player, const State& state) {
+template <typename GameT>
+double expected_value(const GameT& game, const StrategyProfile& profile, Player player, const State& state) {
     if (game.is_terminal(state)) return game.terminal_utility(state, player);
 
     if (game.is_chance(state)) {
@@ -37,7 +38,8 @@ double expected_value(const Game& game, const StrategyProfile& profile, Player p
     return value;
 }
 
-double expected_value(const Game& game, const StrategyProfile& profile, Player player) {
+template <typename GameT>
+double expected_value(const GameT& game, const StrategyProfile& profile, Player player) {
     return expected_value(game, profile, player, game.initial_state());
 }
 

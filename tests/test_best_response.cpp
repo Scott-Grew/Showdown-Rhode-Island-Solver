@@ -13,7 +13,8 @@ using namespace cfr::solver;
 
 namespace {
 
-StrategyProfile uniform_profile(const Game& game) {
+template <typename GameT>
+StrategyProfile uniform_profile(const GameT& game) {
     StrategyProfile profile;
     walk(game, game.initial_state(), [&](const State& state) {
         if (game.is_terminal(state) || game.is_chance(state)) return;
@@ -25,7 +26,8 @@ StrategyProfile uniform_profile(const Game& game) {
     return profile;
 }
 
-StrategyProfile pure_action_profile(const Game& game, Player player, bool use_last_action, StrategyProfile profile) {
+template <typename GameT>
+StrategyProfile pure_action_profile(const GameT& game, Player player, bool use_last_action, StrategyProfile profile) {
     walk(game, game.initial_state(), [&](const State& state) {
         if (game.is_terminal(state) || game.is_chance(state)) return;
         if (game.current_player(state) != player) return;
@@ -37,7 +39,8 @@ StrategyProfile pure_action_profile(const Game& game, Player player, bool use_la
     return profile;
 }
 
-double expected_value(const Game& game, const StrategyProfile& profile, Player player, const State& state) {
+template <typename GameT>
+double expected_value(const GameT& game, const StrategyProfile& profile, Player player, const State& state) {
     if (game.is_terminal(state)) return game.terminal_utility(state, player);
 
     if (game.is_chance(state)) {
@@ -59,7 +62,8 @@ double expected_value(const Game& game, const StrategyProfile& profile, Player p
     return value;
 }
 
-double expected_value(const Game& game, const StrategyProfile& profile, Player player) {
+template <typename GameT>
+double expected_value(const GameT& game, const StrategyProfile& profile, Player player) {
     return expected_value(game, profile, player, game.initial_state());
 }
 

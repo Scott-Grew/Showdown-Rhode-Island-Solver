@@ -19,11 +19,15 @@ concept GameLike = requires(const CandidateGame game, const State state, Action 
     { game.legal_actions(state) } -> std::same_as<std::vector<Action>>;
     { game.apply_action(state, action) } -> std::same_as<State>;
     { game.terminal_utility(state, player) } -> std::same_as<double>;
-    { game.infoset_label(state) } -> std::same_as<InfoSetKey>;
     { game.infoset_index(state) } -> std::same_as<std::uint32_t>;
     { game.infoset_count() } -> std::same_as<std::uint32_t>;
     { game.chance_outcomes(state) } -> std::same_as<std::vector<std::pair<Action, double>>>;
     { CandidateGame::kMaxActions } -> std::convertible_to<std::size_t>;
+};
+
+template <typename CandidateGame>
+concept LabelledGame = GameLike<CandidateGame> && requires(const CandidateGame game, const State state) {
+    { game.infoset_label(state) } -> std::same_as<InfoSetKey>;
 };
 
 }

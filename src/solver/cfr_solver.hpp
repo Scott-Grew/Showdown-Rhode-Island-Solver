@@ -51,8 +51,9 @@ inline void expect_token(std::istream& input, const std::string& expected) {
     }
 }
 
-template <typename StrategyFromStored>
-void collect_strategy_profile(const game::Game& game, const game::State& state,
+template <typename GameT, typename StrategyFromStored>
+requires game::LabelledGame<GameT>
+void collect_strategy_profile(const GameT& game, const game::State& state,
                                const std::vector<double>& stored_table, std::size_t stride,
                                StrategyFromStored&& strategy_from_stored, StrategyProfile& profile) {
     if (game.is_terminal(state)) return;
