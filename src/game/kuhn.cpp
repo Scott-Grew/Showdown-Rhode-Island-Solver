@@ -36,10 +36,7 @@ std::vector<Action> KuhnGame::betting_history(const State& state) {
 }
 
 State KuhnGame::initial_state() const {
-    State state;
-    state.private_cards = {-1, -1};
-    state.pot = 0;
-    return state;
+    return State{};
 }
 
 bool KuhnGame::is_chance(const State& state) const {
