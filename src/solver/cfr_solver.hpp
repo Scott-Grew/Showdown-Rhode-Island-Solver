@@ -21,7 +21,6 @@ namespace cfr::solver {
 
 namespace detail {
 
-inline constexpr double kStrategySumEpsilon = 1e-12;
 inline constexpr char kCheckpointHeader[] = "CFR_CHECKPOINT_V3";
 inline constexpr std::size_t kMaxActionsPerInfoset = 64;
 
@@ -230,25 +229,8 @@ template <typename Rules, typename GameT>
 requires game::GameLike<GameT>
 StrategyProfile CfrSolver<Rules, GameT>::average_strategy() const {
     StrategyProfile profile;
-    detail::collect_strategy_profile(
-        game_, game_.initial_state(), strategy_sums_, kStride,
-        [](std::span<const double> strategy_sum) {
-            double total = std::accumulate(strategy_sum.begin(), strategy_sum.end(), 0.0);
-
-            std::vector<double> strategy(strategy_sum.size());
-            if (total > detail::kStrategySumEpsilon) {
-                for (std::size_t i = 0; i < strategy_sum.size(); ++i) {
-                    strategy[i] = strategy_sum[i] / total;
-                }
-            } else {
-                double uniform_probability = 1.0 / static_cast<double>(strategy_sum.size());
-                for (double& probability : strategy) {
-                    probability = uniform_probability;
-                }
-            }
-            return strategy;
-        },
-        profile);
+    detail::collect_strategy_profile(game_, game_.initial_state(), strategy_sums_, kStride, average_from_sums,
+                                      profile);
     return profile;
 }
 
