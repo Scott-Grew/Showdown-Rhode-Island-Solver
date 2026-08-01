@@ -19,8 +19,11 @@ constexpr Action kLeducActionRaise = 2;
 constexpr int kRound1Bet = 2;
 constexpr int kRound2Bet = 4;
 constexpr int kMaxRaisesPerRound = 2;
+constexpr int kLeducAnte = 1;
 
 constexpr Action kChanceCardOffset = 100;
+
+std::array<int, 2> leduc_contributions(const State& state);
 
 class LeducGame final : public Game {
 public:

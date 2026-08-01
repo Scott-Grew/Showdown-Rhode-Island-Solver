@@ -240,10 +240,8 @@ State RhodeIslandGame::apply_action(const State& state, Action action) const {
         int card = action - kRihChanceCardOffset;
         if (state.private_cards[0] == -1) {
             next.private_cards[0] = static_cast<std::int8_t>(card);
-            next.pot += kRihAnte;
         } else if (state.private_cards[1] == -1) {
             next.private_cards[1] = static_cast<std::int8_t>(card);
-            next.pot += kRihAnte;
         } else {
             next.public_cards[next.public_count++] = static_cast<std::int8_t>(card);
         }
@@ -251,8 +249,6 @@ State RhodeIslandGame::apply_action(const State& state, Action action) const {
     }
 
     next.history[next.history_len++] = static_cast<std::uint8_t>(action);
-    std::array<int, 2> contribution = rih_contributions(next);
-    next.pot = contribution[0] + contribution[1];
     return next;
 }
 

@@ -78,14 +78,10 @@ State KuhnGame::apply_action(const State& state, Action action) const {
             next.private_cards[1] = action;
         }
         next.history[next.history_len++] = static_cast<std::uint8_t>(action);
-        next.pot += 1;
         return next;
     }
 
     next.history[next.history_len++] = static_cast<std::uint8_t>(action);
-    if (action == kKuhnActionBet || action == kKuhnActionCall) {
-        next.pot += 1;
-    }
     return next;
 }
 

@@ -22,7 +22,6 @@ struct State {
     std::uint8_t public_count = 0;
     std::array<std::uint8_t, kMaxHistory> history{};
     std::uint8_t history_len = 0;
-    std::int32_t pot = 0;
 };
 
 class Game {

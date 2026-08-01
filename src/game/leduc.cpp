@@ -82,16 +82,6 @@ void apply_round_contributions(const std::vector<Action>& round_actions, int bet
     contribution[1] += street_contribution[1];
 }
 
-std::array<int, 2> contributions(const State& state) {
-    std::array<int, 2> contribution = {1, 1};
-    ParsedHistory parsed = parse_history(state);
-    apply_round_contributions(parsed.round1_actions, kRound1Bet, contribution);
-    if (parsed.public_card_dealt) {
-        apply_round_contributions(parsed.round2_actions, kRound2Bet, contribution);
-    }
-    return contribution;
-}
-
 int compare_hands(const State& state) {
     int public_rank = state.public_cards[0] / 2;
     int rank0 = state.private_cards[0] / 2;
@@ -133,6 +123,16 @@ int round_progress(const std::vector<Action>& round_actions) {
 
 }
 
+std::array<int, 2> leduc_contributions(const State& state) {
+    std::array<int, 2> contribution = {kLeducAnte, kLeducAnte};
+    ParsedHistory parsed = parse_history(state);
+    apply_round_contributions(parsed.round1_actions, kRound1Bet, contribution);
+    if (parsed.public_card_dealt) {
+        apply_round_contributions(parsed.round2_actions, kRound2Bet, contribution);
+    }
+    return contribution;
+}
+
 State LeducGame::initial_state() const {
     return State{};
 }
@@ -171,10 +171,8 @@ State LeducGame::apply_action(const State& state, Action action) const {
         int card = action - kChanceCardOffset;
         if (state.private_cards[0] == -1) {
             next.private_cards[0] = card;
-            next.pot += 1;
         } else if (state.private_cards[1] == -1) {
             next.private_cards[1] = card;
-            next.pot += 1;
         } else {
             next.public_cards[next.public_count++] = static_cast<std::int8_t>(card);
         }
@@ -182,13 +180,11 @@ State LeducGame::apply_action(const State& state, Action action) const {
     }
 
     next.history[next.history_len++] = static_cast<std::uint8_t>(action);
-    std::array<int, 2> contribution = contributions(next);
-    next.pot = contribution[0] + contribution[1];
     return next;
 }
 
 double LeducGame::terminal_utility(const State& state, Player player) const {
-    std::array<int, 2> contribution = contributions(state);
+    std::array<int, 2> contribution = leduc_contributions(state);
     int pot = contribution[0] + contribution[1];
 
     ParsedHistory parsed = parse_history(state);
