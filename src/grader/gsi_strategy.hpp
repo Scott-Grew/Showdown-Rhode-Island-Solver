@@ -31,9 +31,9 @@ public:
 private:
     struct PublicContext;
 
-    static PublicContext describe(const game::State& state);
+    static PublicContext public_context(const game::State& state);
     std::uint32_t key_for(const PublicContext& context, int hole) const;
-    void write_slots(game::Player actor, std::uint32_t key, int type, double* destination) const;
+    void write_slots(game::Player actor, std::uint32_t key, int decision_type, double* destination) const;
 
     bool available_ = false;
     std::vector<std::uint16_t> signal_class_;

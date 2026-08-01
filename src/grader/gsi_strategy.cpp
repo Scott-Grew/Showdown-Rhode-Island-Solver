@@ -60,7 +60,7 @@ struct GsiStrategy::PublicContext {
     game::Player actor = 0;
 };
 
-GsiStrategy::PublicContext GsiStrategy::describe(const game::State& state) {
+GsiStrategy::PublicContext GsiStrategy::public_context(const game::State& state) {
     game::ParsedRounds parsed = game::parse_rounds(state);
     const std::vector<game::Action>& round_actions = game::active_round_actions(parsed);
 
@@ -100,8 +100,8 @@ std::uint32_t GsiStrategy::key_for(const PublicContext& context, int hole) const
         kGsiRound2KeySpan + 1);
 }
 
-void GsiStrategy::write_slots(game::Player actor, std::uint32_t key, int type, double* destination) const {
-    auto [begin, end] = kSlotRanges[static_cast<std::size_t>(type)];
+void GsiStrategy::write_slots(game::Player actor, std::uint32_t key, int decision_type, double* destination) const {
+    auto [begin, end] = kSlotRanges[static_cast<std::size_t>(decision_type)];
     std::size_t action_count = static_cast<std::size_t>(end - begin);
 
     double total = 0.0;
@@ -165,7 +165,7 @@ GsiStrategy GsiStrategy::load(const std::string& directory) {
 }
 
 std::vector<double> GsiStrategy::action_probabilities(const game::State& state) const {
-    PublicContext context = describe(state);
+    PublicContext context = public_context(state);
     auto [begin, end] = kSlotRanges[static_cast<std::size_t>(context.decision_type)];
     std::vector<double> probabilities(static_cast<std::size_t>(end - begin), 0.0);
     int hole = gsi_card(static_cast<Card>(state.private_cards[context.actor]));
@@ -175,7 +175,7 @@ std::vector<double> GsiStrategy::action_probabilities(const game::State& state) 
 
 void GsiStrategy::action_probabilities_by_card(const game::State& state, game::Player actor,
                                                 std::vector<double>& probabilities_by_card) const {
-    PublicContext context = describe(state);
+    PublicContext context = public_context(state);
     auto [begin, end] = kSlotRanges[static_cast<std::size_t>(context.decision_type)];
     std::size_t action_count = static_cast<std::size_t>(end - begin);
     probabilities_by_card.assign(static_cast<std::size_t>(kCardCount) * action_count, 0.0);
