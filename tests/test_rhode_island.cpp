@@ -103,11 +103,11 @@ long long count_fixed_card_engine_nodes(const RhodeIslandGame& game, const State
 TEST_CASE("RIH betting-subtree node count matches combinatorial formula") {
     RhodeIslandGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
 
-    Action fixed_flop_action = kRihChanceCardOffset + make_card(2, 0);
-    Action fixed_turn_action = kRihChanceCardOffset + make_card(3, 0);
+    Action fixed_flop_action = kChanceCardOffset + make_card(2, 0);
+    Action fixed_turn_action = kChanceCardOffset + make_card(3, 0);
 
     long long engine_node_count = count_fixed_card_engine_nodes(game, state, fixed_flop_action, fixed_turn_action);
     long long formula_node_count = composed_three_round_betting_node_count(kRihMaxRaisesPerRound);
@@ -144,42 +144,42 @@ TEST_CASE("rhode island: initial state is a chance node") {
 TEST_CASE("rhode island: after both hole cards dealt, player 0 acts with check or raise") {
     RhodeIslandGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kRihChanceCardOffset + 0);
-    state = game.apply_action(state, kRihChanceCardOffset + 4);
+    state = game.apply_action(state, kChanceCardOffset + 0);
+    state = game.apply_action(state, kChanceCardOffset + 4);
 
     REQUIRE_FALSE(game.is_chance(state));
     REQUIRE(game.current_player(state) == 0);
     std::vector<Action> legal = game.legal_actions(state);
     REQUIRE(legal.size() == 2);
-    REQUIRE(std::find(legal.begin(), legal.end(), kRihActionCallCheck) != legal.end());
-    REQUIRE(std::find(legal.begin(), legal.end(), kRihActionRaise) != legal.end());
+    REQUIRE(std::find(legal.begin(), legal.end(), kActionCallCheck) != legal.end());
+    REQUIRE(std::find(legal.begin(), legal.end(), kActionRaise) != legal.end());
 }
 
 TEST_CASE("rhode island: raise cap enforced at 3 per round") {
     RhodeIslandGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kRihChanceCardOffset + 0);
-    state = game.apply_action(state, kRihChanceCardOffset + 4);
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihActionRaise);
-    state = game.apply_action(state, kRihActionRaise);
-    state = game.apply_action(state, kRihActionRaise);
+    state = game.apply_action(state, kChanceCardOffset + 0);
+    state = game.apply_action(state, kChanceCardOffset + 4);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionRaise);
+    state = game.apply_action(state, kActionRaise);
+    state = game.apply_action(state, kActionRaise);
 
     REQUIRE_FALSE(game.is_terminal(state));
     std::vector<Action> legal = game.legal_actions(state);
-    REQUIRE(std::find(legal.begin(), legal.end(), kRihActionRaise) == legal.end());
-    REQUIRE(std::find(legal.begin(), legal.end(), kRihActionFold) != legal.end());
-    REQUIRE(std::find(legal.begin(), legal.end(), kRihActionCallCheck) != legal.end());
+    REQUIRE(std::find(legal.begin(), legal.end(), kActionRaise) == legal.end());
+    REQUIRE(std::find(legal.begin(), legal.end(), kActionFold) != legal.end());
+    REQUIRE(std::find(legal.begin(), legal.end(), kActionCallCheck) != legal.end());
 }
 
 TEST_CASE("rhode island: round transitions through flop and turn to terminal") {
     RhodeIslandGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kRihChanceCardOffset + 0);
-    state = game.apply_action(state, kRihChanceCardOffset + 4);
+    state = game.apply_action(state, kChanceCardOffset + 0);
+    state = game.apply_action(state, kChanceCardOffset + 4);
 
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
     REQUIRE(game.is_chance(state));
 
     std::vector<std::pair<Action, double>> flop_outcomes = game.chance_outcomes(state);
@@ -188,8 +188,8 @@ TEST_CASE("rhode island: round transitions through flop and turn to terminal") {
     REQUIRE_FALSE(game.is_terminal(state));
     REQUIRE(game.current_player(state) == 0);
 
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
     REQUIRE(game.is_chance(state));
 
     std::vector<std::pair<Action, double>> turn_outcomes = game.chance_outcomes(state);
@@ -198,8 +198,8 @@ TEST_CASE("rhode island: round transitions through flop and turn to terminal") {
     REQUIRE_FALSE(game.is_terminal(state));
     REQUIRE(game.current_player(state) == 0);
 
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
     REQUIRE(game.is_terminal(state));
     REQUIRE(rih_contributions(state)[0] + rih_contributions(state)[1] == 10);
 }
@@ -226,8 +226,8 @@ TEST_CASE("rhode island: chance outcome probabilities sum to 1 and exclude dealt
     REQUIRE_THAT(hole1_probability_sum, Catch::Matchers::WithinAbs(1.0, 1e-12));
 
     state = game.apply_action(state, hole1_outcomes.front().first);
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
     REQUIRE(game.is_chance(state));
 
     std::vector<std::pair<Action, double>> flop_outcomes = game.chance_outcomes(state);
@@ -238,8 +238,8 @@ TEST_CASE("rhode island: chance outcome probabilities sum to 1 and exclude dealt
 
     Action flop_dealt_action = flop_outcomes.front().first;
     state = game.apply_action(state, flop_dealt_action);
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
     REQUIRE(game.is_chance(state));
 
     std::vector<std::pair<Action, double>> turn_outcomes = game.chance_outcomes(state);
@@ -253,12 +253,12 @@ TEST_CASE("rhode island: chance outcome probabilities sum to 1 and exclude dealt
 TEST_CASE("rhode island: fold in round 1 pays the raiser the folder's contribution") {
     RhodeIslandGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kRihChanceCardOffset + 0);
-    state = game.apply_action(state, kRihChanceCardOffset + 4);
+    state = game.apply_action(state, kChanceCardOffset + 0);
+    state = game.apply_action(state, kChanceCardOffset + 4);
 
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihActionRaise);
-    state = game.apply_action(state, kRihActionFold);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionRaise);
+    state = game.apply_action(state, kActionFold);
 
     REQUIRE(game.is_terminal(state));
     REQUIRE(rih_contributions(state)[0] + rih_contributions(state)[1] == 20);
@@ -269,19 +269,19 @@ TEST_CASE("rhode island: fold in round 1 pays the raiser the folder's contributi
 TEST_CASE("rhode island showdown: straight beats flush at showdown, an RIH-specific inversion") {
     RhodeIslandGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(8, 2));
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(3, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(8, 2));
+    state = game.apply_action(state, kChanceCardOffset + make_card(3, 0));
 
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(4, 2));
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kChanceCardOffset + make_card(4, 2));
 
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(5, 2));
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kChanceCardOffset + make_card(5, 2));
 
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
 
     REQUIRE(game.is_terminal(state));
     REQUIRE(rih_contributions(state)[0] + rih_contributions(state)[1] == 10);
@@ -293,19 +293,19 @@ TEST_CASE("rhode island showdown: straight beats flush at showdown, an RIH-speci
 TEST_CASE("rhode island showdown: equal-ranked hands split the pot") {
     RhodeIslandGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(4, 2));
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(4, 3));
+    state = game.apply_action(state, kChanceCardOffset + make_card(4, 2));
+    state = game.apply_action(state, kChanceCardOffset + make_card(4, 3));
 
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 0));
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
 
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(8, 1));
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kChanceCardOffset + make_card(8, 1));
 
-    state = game.apply_action(state, kRihActionCallCheck);
-    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
 
     REQUIRE(game.is_terminal(state));
     REQUIRE(game.terminal_utility(state, 0) == 0.0);
@@ -315,8 +315,8 @@ TEST_CASE("rhode island showdown: equal-ranked hands split the pot") {
 TEST_CASE("rhode island V1: zero-sum at every terminal of the fixed-hole-cards subtree") {
     RhodeIslandGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
 
     long long terminals_visited = 0;
     walk(game, state, [&](const State& s) {
@@ -331,8 +331,8 @@ TEST_CASE("rhode island V3: legal_actions non-empty at every non-terminal, non-c
           "subtree") {
     RhodeIslandGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
 
     walk(game, state, [&](const State& s) {
         if (game.is_terminal(s) || game.is_chance(s)) return;
@@ -359,9 +359,9 @@ State permute_suits(const State& state, const std::array<int, 4>& suit_permutati
         permuted.public_cards[i] = static_cast<std::int8_t>(remap(state.public_cards[i]));
     }
     for (std::uint8_t i = 0; i < state.history_len; ++i) {
-        if (state.history[i] >= kRihChanceCardOffset) {
+        if (state.history[i] >= kChanceCardOffset) {
             permuted.history[i] =
-                static_cast<std::uint8_t>(kRihChanceCardOffset + remap(state.history[i] - kRihChanceCardOffset));
+                static_cast<std::uint8_t>(kChanceCardOffset + remap(state.history[i] - kChanceCardOffset));
         }
     }
     return permuted;
@@ -372,8 +372,8 @@ State permute_suits(const State& state, const std::array<int, 4>& suit_permutati
 TEST_CASE("rhode island: relabelling the suits changes neither payoffs nor the infoset index") {
     RhodeIslandGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 1));
+    state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(1, 1));
 
     const std::array<int, 4> rotate_suits = {1, 2, 3, 0};
     long long states_checked = 0;
@@ -396,8 +396,8 @@ TEST_CASE("rhode island: relabelling the suits changes neither payoffs nor the i
 TEST_CASE("rhode island: infoset_label determines the infoset index") {
     RhodeIslandGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
 
     std::unordered_map<InfoSetKey, std::uint32_t> label_to_index;
     long long infosets_visited = 0;
@@ -414,28 +414,28 @@ TEST_CASE("rhode island V2: infoset_label and infoset_index hide the opponent's 
     RhodeIslandGame game;
 
     State preflop_state = game.initial_state();
-    preflop_state = game.apply_action(preflop_state, kRihChanceCardOffset + make_card(0, 0));
-    preflop_state = game.apply_action(preflop_state, kRihChanceCardOffset + make_card(1, 0));
+    preflop_state = game.apply_action(preflop_state, kChanceCardOffset + make_card(0, 0));
+    preflop_state = game.apply_action(preflop_state, kChanceCardOffset + make_card(1, 0));
 
     State preflop_state_other_opponent_hole = game.initial_state();
     preflop_state_other_opponent_hole =
-        game.apply_action(preflop_state_other_opponent_hole, kRihChanceCardOffset + make_card(0, 0));
+        game.apply_action(preflop_state_other_opponent_hole, kChanceCardOffset + make_card(0, 0));
     preflop_state_other_opponent_hole =
-        game.apply_action(preflop_state_other_opponent_hole, kRihChanceCardOffset + make_card(9, 3));
+        game.apply_action(preflop_state_other_opponent_hole, kChanceCardOffset + make_card(9, 3));
 
     REQUIRE(game.infoset_label(preflop_state) == game.infoset_label(preflop_state_other_opponent_hole));
     REQUIRE(game.infoset_index(preflop_state) == game.infoset_index(preflop_state_other_opponent_hole));
 
     State postflop_state = preflop_state;
-    postflop_state = game.apply_action(postflop_state, kRihActionCallCheck);
-    postflop_state = game.apply_action(postflop_state, kRihActionCallCheck);
-    postflop_state = game.apply_action(postflop_state, kRihChanceCardOffset + make_card(5, 1));
+    postflop_state = game.apply_action(postflop_state, kActionCallCheck);
+    postflop_state = game.apply_action(postflop_state, kActionCallCheck);
+    postflop_state = game.apply_action(postflop_state, kChanceCardOffset + make_card(5, 1));
 
     State postflop_state_other_opponent_hole = preflop_state_other_opponent_hole;
-    postflop_state_other_opponent_hole = game.apply_action(postflop_state_other_opponent_hole, kRihActionCallCheck);
-    postflop_state_other_opponent_hole = game.apply_action(postflop_state_other_opponent_hole, kRihActionCallCheck);
+    postflop_state_other_opponent_hole = game.apply_action(postflop_state_other_opponent_hole, kActionCallCheck);
+    postflop_state_other_opponent_hole = game.apply_action(postflop_state_other_opponent_hole, kActionCallCheck);
     postflop_state_other_opponent_hole =
-        game.apply_action(postflop_state_other_opponent_hole, kRihChanceCardOffset + make_card(5, 1));
+        game.apply_action(postflop_state_other_opponent_hole, kChanceCardOffset + make_card(5, 1));
 
     REQUIRE(game.infoset_label(postflop_state) == game.infoset_label(postflop_state_other_opponent_hole));
     REQUIRE(game.infoset_index(postflop_state) == game.infoset_index(postflop_state_other_opponent_hole));
@@ -448,29 +448,29 @@ TEST_CASE("V26: rhode island re-raise line pot is exact at every step") {
         return contribution[0] + contribution[1];
     };
     State state = game.initial_state();
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(8, 1));
+    state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(8, 1));
     REQUIRE(pot_of(state) == 10);
-    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
     REQUIRE(pot_of(state) == 10);
-    state = game.apply_action(state, kRihActionRaise);
+    state = game.apply_action(state, kActionRaise);
     REQUIRE(pot_of(state) == 20);
-    state = game.apply_action(state, kRihActionRaise);
+    state = game.apply_action(state, kActionRaise);
     REQUIRE(pot_of(state) == 40);
-    state = game.apply_action(state, kRihActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
     REQUIRE(pot_of(state) == 50);
 }
 
 TEST_CASE("V26: rhode island showdown pays exactly half the pot across the fixed-hole subtree") {
     RhodeIslandGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
 
     long long showdown_terminals = 0;
     walk(game, state, [&](const State& terminal_candidate) {
         if (!game.is_terminal(terminal_candidate)) return;
-        if (terminal_candidate.history[terminal_candidate.history_len - 1] == kRihActionFold) return;
+        if (terminal_candidate.history[terminal_candidate.history_len - 1] == kActionFold) return;
         ++showdown_terminals;
         std::array<int, 2> contribution = rih_contributions(terminal_candidate);
         REQUIRE(contribution[0] == contribution[1]);

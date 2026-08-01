@@ -17,11 +17,11 @@ namespace {
 State facing_opening_raise(int hole_rank, int hole_suit) {
     RhodeIslandGame game;
     State state = game.initial_state();
-    state = game.apply_action(state, kRihChanceCardOffset + make_card(hole_rank, hole_suit));
-    state = game.apply_action(state, kRihChanceCardOffset + make_card((hole_rank + 1) % cfr::kRankCount,
+    state = game.apply_action(state, kChanceCardOffset + make_card(hole_rank, hole_suit));
+    state = game.apply_action(state, kChanceCardOffset + make_card((hole_rank + 1) % cfr::kRankCount,
                                                                       (hole_suit + 1) % cfr::kSuitCount));
-    state = game.apply_action(state, kRihActionCallCheck);
-    return game.apply_action(state, kRihActionRaise);
+    state = game.apply_action(state, kActionCallCheck);
+    return game.apply_action(state, kActionRaise);
 }
 
 constexpr double kGilpinSandholmRound1FoldFrequency[cfr::kRankCount] = {

@@ -18,13 +18,13 @@ constexpr Player kHuman = 0;
 constexpr Player kSolver = 1;
 
 std::string action_prompt(Action action, const State& state) {
-    RihParsedHistory parsed = rih_parse_history(state);
-    const std::vector<Action>& round_actions = rih_active_round_actions(parsed);
-    bool facing_wager = !round_actions.empty() && round_actions.back() == kRihActionRaise;
+    ParsedRounds parsed = parse_rounds(state);
+    const std::vector<Action>& round_actions = active_round_actions(parsed);
+    bool facing_wager = !round_actions.empty() && round_actions.back() == kActionRaise;
     switch (action) {
-        case kRihActionFold: return "fold";
-        case kRihActionCallCheck: return facing_wager ? "call" : "check";
-        case kRihActionRaise: return facing_wager ? "raise" : "bet";
+        case kActionFold: return "fold";
+        case kActionCallCheck: return facing_wager ? "call" : "check";
+        case kActionRaise: return facing_wager ? "raise" : "bet";
     }
     return "?";
 }
@@ -52,7 +52,7 @@ Action ask_human(const RhodeIslandGame& game, const State& state) {
         std::cout << "]: " << std::flush;
 
         std::string typed;
-        if (!(std::cin >> typed)) return kRihActionFold;
+        if (!(std::cin >> typed)) return kActionFold;
         std::transform(typed.begin(), typed.end(), typed.begin(), [](unsigned char c) { return std::tolower(c); });
         for (Action action : actions) {
             if (action_prompt(action, state) == typed) return action;
@@ -122,13 +122,13 @@ int main(int argc, char** argv) {
     while (true) {
         std::shuffle(deck.begin(), deck.end(), random_engine);
         State state = game.initial_state();
-        state = game.apply_action(state, kRihChanceCardOffset + deck[0]);
-        state = game.apply_action(state, kRihChanceCardOffset + deck[1]);
+        state = game.apply_action(state, kChanceCardOffset + deck[0]);
+        state = game.apply_action(state, kChanceCardOffset + deck[1]);
         int next_board_card = 2;
 
         while (!game.is_terminal(state)) {
             if (game.is_chance(state)) {
-                state = game.apply_action(state, kRihChanceCardOffset + deck[next_board_card++]);
+                state = game.apply_action(state, kChanceCardOffset + deck[next_board_card++]);
                 show_table(state, false);
                 continue;
             }
