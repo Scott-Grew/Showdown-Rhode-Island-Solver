@@ -23,8 +23,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2)
 
-# cfr_game and cfr_eval are STATIC libraries now that Kuhn/Leduc (T3/T4) and
-# the evaluator (T5/T6) provide real sources.
 add_library(cfr_game STATIC
     src/game/kuhn.cpp
     src/game/leduc.cpp
@@ -37,9 +35,6 @@ add_library(cfr_eval STATIC
 )
 target_include_directories(cfr_eval PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
-# Naive 5-card reference: obviously-correct, deliberately unoptimized,
-# shares no code with cfr_eval's fast path. Test-only -- linked into
-# cfr_tests alone so no cfr_eval consumer ever pulls it in.
 add_library(cfr_eval_naive_ref STATIC
     src/eval/naive_ref.cpp
 )

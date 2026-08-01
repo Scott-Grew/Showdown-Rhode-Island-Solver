@@ -34,9 +34,10 @@ BoardRanks rank_every_hole_card(int board0, int board1) {
 
 class BestResponseWalk {
 public:
-    BestResponseWalk(const RihStrategyQuery& opponent_strategy, Player responder, bool maximize)
+    BestResponseWalk(const RihStrategyQuery& opponent_strategy, Player responder, bool maximize,
+                      int deviation_round)
         : opponent_strategy_(opponent_strategy), responder_(responder), opponent_(1 - responder),
-          maximize_(maximize) {}
+          maximize_(maximize), deviation_round_(deviation_round) {}
 
     RihCardVector walk(const State& state, const RihCardVector& opponent_reach, const BoardRanks* ranks) {
         if (game_.is_terminal(state)) return terminal_value(state, opponent_reach, ranks);
@@ -189,10 +190,7 @@ private:
     Player responder_;
     Player opponent_;
     bool maximize_;
-    int deviation_round_ = -1;
-
-public:
-    void set_deviation_round(int round) { deviation_round_ = round; }
+    int deviation_round_;
 };
 
 double walk_root(const RihStrategyQuery& strategy, Player responder, bool maximize, int deviation_round = -1) {
@@ -204,8 +202,7 @@ double walk_root(const RihStrategyQuery& strategy, Player responder, bool maximi
     RihCardVector opponent_reach;
     opponent_reach.fill(1.0);
 
-    BestResponseWalk walker(strategy, responder, maximize);
-    walker.set_deviation_round(deviation_round);
+    BestResponseWalk walker(strategy, responder, maximize, deviation_round);
     RihCardVector value = walker.walk(root, opponent_reach, nullptr);
     return std::accumulate(value.begin(), value.end(), 0.0) / kOrderedDealCount;
 }
