@@ -340,28 +340,71 @@ TEST_CASE("rhode island V3: legal_actions non-empty at every non-terminal, non-c
     });
 }
 
-TEST_CASE("rhode island: infoset_index is a collision-free bijection with infoset_label over the "
-          "fixed-hole-cards subtree") {
+namespace {
+
+State permute_suits(const State& state, const std::array<int, 4>& suit_permutation) {
+    auto remap = [&suit_permutation](int card) {
+        return static_cast<int>(make_card(cfr::card_rank(static_cast<cfr::Card>(card)),
+                                           suit_permutation[static_cast<std::size_t>(
+                                               cfr::card_suit(static_cast<cfr::Card>(card)))]));
+    };
+
+    State permuted = state;
+    for (std::size_t i = 0; i < 2; ++i) {
+        if (state.private_cards[i] >= 0) {
+            permuted.private_cards[i] = static_cast<std::int8_t>(remap(state.private_cards[i]));
+        }
+    }
+    for (std::uint8_t i = 0; i < state.public_count; ++i) {
+        permuted.public_cards[i] = static_cast<std::int8_t>(remap(state.public_cards[i]));
+    }
+    for (std::uint8_t i = 0; i < state.history_len; ++i) {
+        if (state.history[i] >= kRihChanceCardOffset) {
+            permuted.history[i] =
+                static_cast<std::uint8_t>(kRihChanceCardOffset + remap(state.history[i] - kRihChanceCardOffset));
+        }
+    }
+    return permuted;
+}
+
+}
+
+TEST_CASE("rhode island: relabelling the suits changes neither payoffs nor the infoset index") {
+    RhodeIslandGame game;
+    State state = game.initial_state();
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 1));
+
+    const std::array<int, 4> rotate_suits = {1, 2, 3, 0};
+    long long states_checked = 0;
+
+    walk(game, state, [&](const State& s) {
+        State permuted = permute_suits(s, rotate_suits);
+        if (game.is_terminal(s)) {
+            REQUIRE(game.terminal_utility(s, 0) == game.terminal_utility(permuted, 0));
+            ++states_checked;
+            return;
+        }
+        if (game.is_chance(s)) return;
+        REQUIRE(game.infoset_index(s) < game.infoset_count());
+        REQUIRE(game.infoset_index(s) == game.infoset_index(permuted));
+        ++states_checked;
+    });
+    REQUIRE(states_checked > 0);
+}
+
+TEST_CASE("rhode island: infoset_label determines the infoset index") {
     RhodeIslandGame game;
     State state = game.initial_state();
     state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
     state = game.apply_action(state, kRihChanceCardOffset + make_card(1, 0));
 
     std::unordered_map<InfoSetKey, std::uint32_t> label_to_index;
-    std::unordered_map<std::uint32_t, InfoSetKey> index_to_label;
     long long infosets_visited = 0;
     walk(game, state, [&](const State& s) {
         if (game.is_terminal(s) || game.is_chance(s)) return;
-        InfoSetKey label = game.infoset_label(s);
-        std::uint32_t index = game.infoset_index(s);
-        REQUIRE(index < game.infoset_count());
-
-        auto [label_entry, label_inserted] = label_to_index.emplace(label, index);
-        if (!label_inserted) REQUIRE(label_entry->second == index);
-
-        auto [index_entry, index_inserted] = index_to_label.emplace(index, label);
-        if (!index_inserted) REQUIRE(index_entry->second == label);
-
+        auto [entry, inserted] = label_to_index.emplace(game.infoset_label(s), game.infoset_index(s));
+        if (!inserted) REQUIRE(entry->second == game.infoset_index(s));
         ++infosets_visited;
     });
     REQUIRE(infosets_visited > 0);
