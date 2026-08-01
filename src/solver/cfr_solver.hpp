@@ -29,6 +29,7 @@ inline void write_table(std::ostream& output, const std::vector<double>& table) 
     for (double value : table) {
         output << std::hex << std::bit_cast<std::uint64_t>(value) << std::dec << '\n';
     }
+    if (!output) throw std::runtime_error("cfr checkpoint: write failed inside table");
 }
 
 inline std::vector<double> read_table(std::istream& input, std::size_t value_count) {
@@ -272,6 +273,8 @@ void CfrSolver<Rules, GameT>::save_checkpoint(const std::string& path) const {
     detail::write_table(output, cumulative_regrets_);
     output << "strategy_sums\n";
     detail::write_table(output, strategy_sums_);
+    output.flush();
+    if (!output) throw std::runtime_error("cfr checkpoint: write to '" + path + "' failed, checkpoint is incomplete");
 }
 
 template <typename Rules, typename GameT>

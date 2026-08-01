@@ -62,6 +62,8 @@ public:
         output.write(reinterpret_cast<const char*>(&iteration_), sizeof(iteration_));
         output.write(reinterpret_cast<const char*>(strategy_sums_.data()),
                      static_cast<std::streamsize>(value_count * sizeof(double)));
+        output.flush();
+        if (!output) throw std::runtime_error("mccfr: write to '" + path + "' failed, strategy is incomplete");
     }
 
     void load_strategy_sums(const std::string& path) {
@@ -70,11 +72,16 @@ public:
         std::uint64_t value_count = 0;
         input.read(reinterpret_cast<char*>(&value_count), sizeof(value_count));
         input.read(reinterpret_cast<char*>(&iteration_), sizeof(iteration_));
+        if (!input) throw std::runtime_error("mccfr: '" + path + "' is truncated inside the header");
         if (value_count != strategy_sums_.size()) {
             throw std::runtime_error("mccfr: strategy table size mismatch");
         }
         input.read(reinterpret_cast<char*>(strategy_sums_.data()),
                    static_cast<std::streamsize>(value_count * sizeof(double)));
+        if (!input) throw std::runtime_error("mccfr: '" + path + "' is truncated inside the strategy table");
+        if (input.peek() != std::char_traits<char>::eof()) {
+            throw std::runtime_error("mccfr: '" + path + "' has trailing bytes after the strategy table");
+        }
     }
 
     StrategyProfile average_strategy() const {
