@@ -5,6 +5,9 @@
 #include <cstddef>
 #include <limits>
 
+#include "game/kuhn.hpp"
+#include "game/leduc.hpp"
+
 namespace cfr::solver {
 
 namespace {
@@ -13,7 +16,8 @@ using StatesByInfoset = std::map<game::InfoSetKey, std::vector<std::pair<game::S
 
 using BestResponseMemo = std::map<game::InfoSetKey, double>;
 
-std::vector<double> opponent_action_probabilities(const game::Game& game, const game::State& state,
+template <typename GameT>
+std::vector<double> opponent_action_probabilities(const GameT& game, const game::State& state,
                                                     const StrategyProfile& opponent_strategy,
                                                     const std::vector<game::Action>& actions) {
     auto profile_entry = opponent_strategy.find(game.infoset_label(state));
@@ -27,7 +31,8 @@ std::vector<double> opponent_action_probabilities(const game::Game& game, const 
 
 constexpr double kUnreachableInfosetWeightEpsilon = 1e-12;
 
-void collect_responder_states(const game::Game& game, const game::State& state, double reach_weight,
+template <typename GameT>
+void collect_responder_states(const GameT& game, const game::State& state, double reach_weight,
                                const StrategyProfile& opponent_strategy, game::Player responder,
                                StatesByInfoset& states_by_infoset) {
     if (game.is_terminal(state)) return;
@@ -59,10 +64,12 @@ void collect_responder_states(const game::Game& game, const game::State& state, 
     }
 }
 
-double node_value(const game::Game& game, const game::State& state, const StrategyProfile& opponent_strategy,
+template <typename GameT>
+double node_value(const GameT& game, const game::State& state, const StrategyProfile& opponent_strategy,
                    game::Player responder, const StatesByInfoset& states_by_infoset, BestResponseMemo& memo);
 
-double best_response_value_at(const game::Game& game, const game::InfoSetKey& infoset_label,
+template <typename GameT>
+double best_response_value_at(const GameT& game, const game::InfoSetKey& infoset_label,
                                const StrategyProfile& opponent_strategy, game::Player responder,
                                const StatesByInfoset& states_by_infoset, BestResponseMemo& memo) {
     auto memo_entry = memo.find(infoset_label);
@@ -88,7 +95,8 @@ double best_response_value_at(const game::Game& game, const game::InfoSetKey& in
     return normalized_best_value;
 }
 
-double node_value(const game::Game& game, const game::State& state, const StrategyProfile& opponent_strategy,
+template <typename GameT>
+double node_value(const GameT& game, const game::State& state, const StrategyProfile& opponent_strategy,
                    game::Player responder, const StatesByInfoset& states_by_infoset, BestResponseMemo& memo) {
     if (game.is_terminal(state)) {
         return game.terminal_utility(state, responder);
@@ -122,8 +130,9 @@ double node_value(const game::Game& game, const game::State& state, const Strate
 
 }
 
-double best_response_value(const game::Game& game, const StrategyProfile& opponent_strategy,
-                            game::Player responder) {
+template <typename GameT>
+requires game::LabelledGame<GameT>
+double best_response_value(const GameT& game, const StrategyProfile& opponent_strategy, game::Player responder) {
     StatesByInfoset states_by_infoset;
     collect_responder_states(game, game.initial_state(), 1.0, opponent_strategy, responder, states_by_infoset);
 
@@ -131,8 +140,15 @@ double best_response_value(const game::Game& game, const StrategyProfile& oppone
     return node_value(game, game.initial_state(), opponent_strategy, responder, states_by_infoset, memo);
 }
 
-double exploitability(const game::Game& game, const StrategyProfile& profile) {
+template <typename GameT>
+requires game::LabelledGame<GameT>
+double exploitability(const GameT& game, const StrategyProfile& profile) {
     return (best_response_value(game, profile, 0) + best_response_value(game, profile, 1)) / 2.0;
 }
+
+template double best_response_value<game::KuhnGame>(const game::KuhnGame&, const StrategyProfile&, game::Player);
+template double best_response_value<game::LeducGame>(const game::LeducGame&, const StrategyProfile&, game::Player);
+template double exploitability<game::KuhnGame>(const game::KuhnGame&, const StrategyProfile&);
+template double exploitability<game::LeducGame>(const game::LeducGame&, const StrategyProfile&);
 
 }

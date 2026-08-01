@@ -8,6 +8,7 @@
 
 #include "game/card.hpp"
 #include "game/game.hpp"
+#include "game/game_concept.hpp"
 
 namespace cfr::solver {
 
@@ -25,8 +26,9 @@ double rih_best_response_value_in_round(const RihStrategyQuery& opponent_strateg
 
 double rih_exploitability(const RihStrategyQuery& profile);
 
-template <typename AverageStrategySource>
-RihStrategyQuery rih_average_strategy_query(const AverageStrategySource& source, const game::Game& game) {
+template <typename AverageStrategySource, typename GameT>
+requires game::GameLike<GameT>
+RihStrategyQuery rih_average_strategy_query(const AverageStrategySource& source, const GameT& game) {
     return [&source, &game](const game::State& state, game::Player actor, std::vector<double>& probabilities_by_card) {
         std::size_t action_count = game.legal_actions(state).size();
         probabilities_by_card.assign(static_cast<std::size_t>(kCardCount) * action_count, 0.0);

@@ -4,8 +4,8 @@
 
 namespace cfr::game {
 
-template <typename Fn>
-void walk(const Game& game, const State& state, Fn&& visit) {
+template <typename GameT, typename Fn>
+void walk(const GameT& game, const State& state, Fn&& visit) {
     visit(state);
     if (game.is_terminal(state)) return;
     if (game.is_chance(state)) {
