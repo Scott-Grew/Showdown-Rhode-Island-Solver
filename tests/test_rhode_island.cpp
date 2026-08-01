@@ -201,7 +201,7 @@ TEST_CASE("rhode island: round transitions through flop and turn to terminal") {
     state = game.apply_action(state, kRihActionCallCheck);
     state = game.apply_action(state, kRihActionCallCheck);
     REQUIRE(game.is_terminal(state));
-    REQUIRE(state.pot == 10);
+    REQUIRE(rih_contributions(state)[0] + rih_contributions(state)[1] == 10);
 }
 
 TEST_CASE("rhode island: chance outcome probabilities sum to 1 and exclude dealt cards") {
@@ -261,7 +261,7 @@ TEST_CASE("rhode island: fold in round 1 pays the raiser the folder's contributi
     state = game.apply_action(state, kRihActionFold);
 
     REQUIRE(game.is_terminal(state));
-    REQUIRE(state.pot == 20);
+    REQUIRE(rih_contributions(state)[0] + rih_contributions(state)[1] == 20);
     REQUIRE(game.terminal_utility(state, 0) == -5.0);
     REQUIRE(game.terminal_utility(state, 1) == 5.0);
 }
@@ -284,7 +284,7 @@ TEST_CASE("rhode island showdown: straight beats flush at showdown, an RIH-speci
     state = game.apply_action(state, kRihActionCallCheck);
 
     REQUIRE(game.is_terminal(state));
-    REQUIRE(state.pot == 10);
+    REQUIRE(rih_contributions(state)[0] + rih_contributions(state)[1] == 10);
     REQUIRE(game.terminal_utility(state, 1) == 5.0);
     REQUIRE(game.terminal_utility(state, 0) == -5.0);
     REQUIRE(game.terminal_utility(state, 0) + game.terminal_utility(state, 1) == 0.0);
@@ -443,18 +443,22 @@ TEST_CASE("rhode island V2: infoset_label and infoset_index hide the opponent's 
 
 TEST_CASE("V26: rhode island re-raise line pot is exact at every step") {
     RhodeIslandGame game;
+    auto pot_of = [](const State& s) {
+        std::array<int, 2> contribution = rih_contributions(s);
+        return contribution[0] + contribution[1];
+    };
     State state = game.initial_state();
     state = game.apply_action(state, kRihChanceCardOffset + make_card(0, 0));
     state = game.apply_action(state, kRihChanceCardOffset + make_card(8, 1));
-    REQUIRE(state.pot == 10);
+    REQUIRE(pot_of(state) == 10);
     state = game.apply_action(state, kRihActionCallCheck);
-    REQUIRE(state.pot == 10);
+    REQUIRE(pot_of(state) == 10);
     state = game.apply_action(state, kRihActionRaise);
-    REQUIRE(state.pot == 20);
+    REQUIRE(pot_of(state) == 20);
     state = game.apply_action(state, kRihActionRaise);
-    REQUIRE(state.pot == 40);
+    REQUIRE(pot_of(state) == 40);
     state = game.apply_action(state, kRihActionCallCheck);
-    REQUIRE(state.pot == 50);
+    REQUIRE(pot_of(state) == 50);
 }
 
 TEST_CASE("V26: rhode island showdown pays exactly half the pot across the fixed-hole subtree") {
@@ -468,9 +472,12 @@ TEST_CASE("V26: rhode island showdown pays exactly half the pot across the fixed
         if (!game.is_terminal(terminal_candidate)) return;
         if (terminal_candidate.history[terminal_candidate.history_len - 1] == kRihActionFold) return;
         ++showdown_terminals;
-        REQUIRE(terminal_candidate.pot % 2 == 0);
+        std::array<int, 2> contribution = rih_contributions(terminal_candidate);
+        REQUIRE(contribution[0] == contribution[1]);
+        int pot = contribution[0] + contribution[1];
+        REQUIRE(pot % 2 == 0);
         double first_player_utility = game.terminal_utility(terminal_candidate, 0);
-        double half_pot = terminal_candidate.pot / 2.0;
+        double half_pot = pot / 2.0;
         REQUIRE((first_player_utility == 0.0 || first_player_utility == half_pot ||
                  first_player_utility == -half_pot));
     });

@@ -159,16 +159,20 @@ TEST_CASE("leduc: round 2 bet doubles round 1's size") {
 
 TEST_CASE("V26: leduc re-raise line pot is exact at every step") {
     LeducGame game;
+    auto pot_of = [](const State& state) {
+        std::array<int, 2> contribution = leduc_contributions(state);
+        return contribution[0] + contribution[1];
+    };
     State state = game.initial_state();
     state = game.apply_action(state, kChanceCardOffset + 0);
     state = game.apply_action(state, kChanceCardOffset + 2);
-    REQUIRE(state.pot == 2);
+    REQUIRE(pot_of(state) == 2);
     state = game.apply_action(state, kLeducActionRaise);
-    REQUIRE(state.pot == 4);
+    REQUIRE(pot_of(state) == 4);
     state = game.apply_action(state, kLeducActionRaise);
-    REQUIRE(state.pot == 8);
+    REQUIRE(pot_of(state) == 8);
     state = game.apply_action(state, kLeducActionCallCheck);
-    REQUIRE(state.pot == 10);
+    REQUIRE(pot_of(state) == 10);
 }
 
 TEST_CASE("V26: leduc showdown pays exactly half the pot — a closed round leaves equal money in") {
@@ -178,9 +182,12 @@ TEST_CASE("V26: leduc showdown pays exactly half the pot — a closed round leav
         if (!game.is_terminal(state)) return;
         if (state.history[state.history_len - 1] == kLeducActionFold) return;
         ++showdown_terminals;
-        REQUIRE(state.pot % 2 == 0);
+        std::array<int, 2> contribution = leduc_contributions(state);
+        REQUIRE(contribution[0] == contribution[1]);
+        int pot = contribution[0] + contribution[1];
+        REQUIRE(pot % 2 == 0);
         double first_player_utility = game.terminal_utility(state, 0);
-        double half_pot = state.pot / 2.0;
+        double half_pot = pot / 2.0;
         REQUIRE((first_player_utility == 0.0 || first_player_utility == half_pot ||
                  first_player_utility == -half_pot));
     });
