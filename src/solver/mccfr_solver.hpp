@@ -42,16 +42,8 @@ public:
     void average_strategy_into(std::uint32_t infoset_index, std::size_t action_count,
                                 std::span<double> strategy) const {
         std::size_t offset = static_cast<std::size_t>(infoset_index) * kStride;
-        double total = 0.0;
-        for (std::size_t i = 0; i < action_count; ++i) total += strategy_sums_[offset + i];
-
-        if (total <= detail::kStrategySumEpsilon) {
-            for (std::size_t i = 0; i < action_count; ++i) {
-                strategy[i] = 1.0 / static_cast<double>(action_count);
-            }
-            return;
-        }
-        for (std::size_t i = 0; i < action_count; ++i) strategy[i] = strategy_sums_[offset + i] / total;
+        for (std::size_t i = 0; i < action_count; ++i) strategy[i] = strategy_sums_[offset + i];
+        normalize_or_uniform(strategy.subspan(0, action_count));
     }
 
     void save_strategy_sums(const std::string& path) const {
@@ -86,23 +78,8 @@ public:
 
     StrategyProfile average_strategy() const {
         StrategyProfile profile;
-        detail::collect_strategy_profile(
-            game_, game_.initial_state(), strategy_sums_, kStride,
-            [](std::span<const double> strategy_sum) {
-                double total = 0.0;
-                for (double value : strategy_sum) total += value;
-
-                std::vector<double> strategy(strategy_sum.size());
-                if (total > detail::kStrategySumEpsilon) {
-                    for (std::size_t i = 0; i < strategy_sum.size(); ++i) strategy[i] = strategy_sum[i] / total;
-                } else {
-                    for (double& probability : strategy) {
-                        probability = 1.0 / static_cast<double>(strategy_sum.size());
-                    }
-                }
-                return strategy;
-            },
-            profile);
+        detail::collect_strategy_profile(game_, game_.initial_state(), strategy_sums_, kStride, average_from_sums,
+                                          profile);
         return profile;
     }
 
