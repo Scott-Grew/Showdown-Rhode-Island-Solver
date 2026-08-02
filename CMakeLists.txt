@@ -13,6 +13,8 @@ if(CFR_HAS_AVX2_FLAG)
     add_compile_options(-mavx2)
 endif()
 
+find_package(Threads REQUIRED)
+
 include(FetchContent)
 set(FETCHCONTENT_BASE_DIR ${CMAKE_SOURCE_DIR}/.deps CACHE PATH "Shared dependency cache")
 FetchContent_Declare(
@@ -46,7 +48,7 @@ add_library(cfr_solver STATIC
     src/solver/rih_best_response.cpp
 )
 target_include_directories(cfr_solver PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(cfr_solver PUBLIC cfr_game cfr_eval)
+target_link_libraries(cfr_solver PUBLIC cfr_game cfr_eval Threads::Threads)
 
 add_library(cfr_grader STATIC
     src/grader/gsi_strategy.cpp
