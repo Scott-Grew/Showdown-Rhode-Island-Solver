@@ -127,11 +127,13 @@ bool RhodeIslandGame::is_terminal(const State& state) const {
 
 Player RhodeIslandGame::current_player(const State& state) const {
     if (is_chance(state)) return -1;
-    return round_actor(active_round_actions(parse_rounds(state)));
+    ParsedRounds parsed = parse_rounds(state);
+    return round_actor(active_round_actions(parsed));
 }
 
 std::vector<Action> RhodeIslandGame::legal_actions(const State& state) const {
-    return round_legal_actions(active_round_actions(parse_rounds(state)), kRihMaxRaisesPerRound);
+    ParsedRounds parsed = parse_rounds(state);
+    return round_legal_actions(active_round_actions(parsed), kRihMaxRaisesPerRound);
 }
 
 State RhodeIslandGame::apply_action(const State& state, Action action) const {
@@ -144,7 +146,8 @@ State RhodeIslandGame::apply_action(const State& state, Action action) const {
 
 double RhodeIslandGame::terminal_utility(const State& state, Player player) const {
     std::array<int, 2> contribution = rih_contributions(state);
-    const std::vector<Action>& final_round = active_round_actions(parse_rounds(state));
+    ParsedRounds parsed = parse_rounds(state);
+    const std::vector<Action>& final_round = active_round_actions(parsed);
 
     if (folded(final_round)) {
         Player folder = static_cast<Player>((final_round.size() - 1) % 2);

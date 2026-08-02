@@ -72,11 +72,13 @@ bool LeducGame::is_terminal(const State& state) const {
 
 Player LeducGame::current_player(const State& state) const {
     if (is_chance(state)) return -1;
-    return round_actor(active_round_actions(parse_rounds(state)));
+    ParsedRounds parsed = parse_rounds(state);
+    return round_actor(active_round_actions(parsed));
 }
 
 std::vector<Action> LeducGame::legal_actions(const State& state) const {
-    return round_legal_actions(active_round_actions(parse_rounds(state)), kMaxRaisesPerRound);
+    ParsedRounds parsed = parse_rounds(state);
+    return round_legal_actions(active_round_actions(parsed), kMaxRaisesPerRound);
 }
 
 State LeducGame::apply_action(const State& state, Action action) const {

@@ -47,6 +47,8 @@ inline const std::vector<Action>& active_round_actions(const ParsedRounds& parse
     return parsed.round[static_cast<std::size_t>(std::min<int>(parsed.board_cards_dealt, kMaxBettingRounds - 1))];
 }
 
+const std::vector<Action>& active_round_actions(ParsedRounds&&) = delete;
+
 inline bool folded(const std::vector<Action>& round_actions) {
     return !round_actions.empty() && round_actions.back() == kActionFold;
 }
