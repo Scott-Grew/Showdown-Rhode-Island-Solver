@@ -36,14 +36,14 @@ int signal_index(int hole, int board0, int board1) {
     return 2704 + 2652 * shifted_board + (signal_index(hole, board0) - kCardCount);
 }
 
-int gsi_sequence(const std::vector<game::Action>& round_actions) {
+int gsi_sequence(std::span<const game::Action> round_actions) {
     int raises_used =
         static_cast<int>(std::count(round_actions.begin(), round_actions.end(), game::kActionRaise));
     bool opened_with_check = !round_actions.empty() && round_actions.front() == game::kActionCallCheck;
     return opened_with_check ? raises_used : raises_used + 3;
 }
 
-int decision_type(const std::vector<game::Action>& round_actions) {
+int decision_type(std::span<const game::Action> round_actions) {
     if (round_actions.empty() || round_actions.back() != game::kActionRaise) return 0;
     return static_cast<int>(std::count(round_actions.begin(), round_actions.end(), game::kActionRaise));
 }
@@ -62,7 +62,7 @@ struct GsiStrategy::PublicContext {
 
 GsiStrategy::PublicContext GsiStrategy::public_context(const game::State& state) {
     game::ParsedRounds parsed = game::parse_rounds(state);
-    const std::vector<game::Action>& round_actions = game::active_round_actions(parsed);
+    std::span<const game::Action> round_actions = game::active_round_actions(parsed);
 
     PublicContext context;
     context.board_cards_dealt = parsed.board_cards_dealt;
@@ -70,11 +70,11 @@ GsiStrategy::PublicContext GsiStrategy::public_context(const game::State& state)
     context.actor = static_cast<game::Player>(round_actions.size() % 2);
     if (parsed.board_cards_dealt >= 1) {
         context.board0 = gsi_card(static_cast<Card>(state.public_cards[0]));
-        context.sequence1 = gsi_sequence(parsed.round[0]);
+        context.sequence1 = gsi_sequence(parsed.round(0));
     }
     if (parsed.board_cards_dealt >= 2) {
         context.board1 = gsi_card(static_cast<Card>(state.public_cards[1]));
-        context.sequence2 = gsi_sequence(parsed.round[1]);
+        context.sequence2 = gsi_sequence(parsed.round(1));
     }
     return context;
 }

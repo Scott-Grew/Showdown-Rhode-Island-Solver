@@ -23,7 +23,7 @@ cfr::solver::RihStrategyQuery player0_bets_only_in_round(int target_round) {
     return [target_round](const State& state, Player actor, std::vector<double>& probabilities) {
         RhodeIslandGame game;
         ParsedRounds parsed = parse_rounds(state);
-        const std::vector<Action>& round_actions = active_round_actions(parsed);
+        std::span<const Action> round_actions = active_round_actions(parsed);
         std::size_t action_count = game.legal_actions(state).size();
         probabilities.assign(static_cast<std::size_t>(cfr::kCardCount) * action_count, 0.0);
 

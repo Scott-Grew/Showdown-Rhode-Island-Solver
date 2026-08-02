@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -21,10 +22,16 @@ constexpr Action kChanceCardOffset = 100;
 
 constexpr std::size_t kMaxBettingRounds = 3;
 constexpr int kHoleCardsDealt = 2;
+constexpr std::size_t kMaxActionsPerRound = 8;
 
 struct ParsedRounds {
-    std::array<std::vector<Action>, kMaxBettingRounds> round;
+    std::array<std::array<Action, kMaxActionsPerRound>, kMaxBettingRounds> action{};
+    std::array<std::uint8_t, kMaxBettingRounds> count{};
     int board_cards_dealt = 0;
+
+    std::span<const Action> round(std::size_t index) const {
+        return std::span<const Action>(action[index].data(), count[index]);
+    }
 };
 
 inline ParsedRounds parse_rounds(const State& state) {
@@ -37,43 +44,45 @@ inline ParsedRounds parse_rounds(const State& state) {
             continue;
         }
         int board_dealt = std::max(0, chance_events_seen - kHoleCardsDealt);
-        parsed.round[static_cast<std::size_t>(std::min<int>(board_dealt, kMaxBettingRounds - 1))].push_back(entry);
+        std::size_t slot = static_cast<std::size_t>(std::min<int>(board_dealt, kMaxBettingRounds - 1));
+        assert(parsed.count[slot] < kMaxActionsPerRound);
+        parsed.action[slot][parsed.count[slot]++] = entry;
     }
     parsed.board_cards_dealt = std::max(0, chance_events_seen - kHoleCardsDealt);
     return parsed;
 }
 
-inline const std::vector<Action>& active_round_actions(const ParsedRounds& parsed) {
-    return parsed.round[static_cast<std::size_t>(std::min<int>(parsed.board_cards_dealt, kMaxBettingRounds - 1))];
+inline std::span<const Action> active_round_actions(const ParsedRounds& parsed) {
+    return parsed.round(static_cast<std::size_t>(std::min<int>(parsed.board_cards_dealt, kMaxBettingRounds - 1)));
 }
 
-const std::vector<Action>& active_round_actions(ParsedRounds&&) = delete;
+std::span<const Action> active_round_actions(ParsedRounds&&) = delete;
 
-inline bool folded(const std::vector<Action>& round_actions) {
+inline bool folded(std::span<const Action> round_actions) {
     return !round_actions.empty() && round_actions.back() == kActionFold;
 }
 
-inline bool round_closed(const std::vector<Action>& round_actions) {
+inline bool round_closed(std::span<const Action> round_actions) {
     if (round_actions.size() < 2) return false;
     if (round_actions.back() != kActionCallCheck) return false;
     Action previous = round_actions[round_actions.size() - 2];
     return previous == kActionCallCheck || previous == kActionRaise;
 }
 
-inline Player round_actor(const std::vector<Action>& round_actions) {
+inline Player round_actor(std::span<const Action> round_actions) {
     return static_cast<Player>(round_actions.size() % 2);
 }
 
-inline int raises_used(const std::vector<Action>& round_actions) {
+inline int raises_used(std::span<const Action> round_actions) {
     return static_cast<int>(std::count(round_actions.begin(), round_actions.end(), kActionRaise));
 }
 
-inline int round_progress(const std::vector<Action>& round_actions) {
+inline int round_progress(std::span<const Action> round_actions) {
     bool opened_with_check = !round_actions.empty() && round_actions.front() == kActionCallCheck;
     return raises_used(round_actions) * 2 + (opened_with_check ? 1 : 0);
 }
 
-inline std::vector<Action> round_legal_actions(const std::vector<Action>& round_actions, int max_raises) {
+inline std::vector<Action> round_legal_actions(std::span<const Action> round_actions, int max_raises) {
     bool facing_wager = !round_actions.empty() && round_actions.back() == kActionRaise;
     if (!facing_wager) {
         return {kActionCallCheck, kActionRaise};
@@ -84,7 +93,7 @@ inline std::vector<Action> round_legal_actions(const std::vector<Action>& round_
     return {kActionFold, kActionCallCheck};
 }
 
-inline void apply_round_contributions(const std::vector<Action>& round_actions, int bet_size,
+inline void apply_round_contributions(std::span<const Action> round_actions, int bet_size,
                                        std::array<int, 2>& contribution) {
     std::array<int, 2> street_contribution = {0, 0};
     int level_to_match = 0;
@@ -150,6 +159,10 @@ inline std::vector<std::pair<Action, double>> deal_outcomes(const State& state, 
 
 constexpr int max_history_depth(int rounds, int max_raises, int chance_events) {
     return rounds * (max_raises + 2) + chance_events;
+}
+
+constexpr int max_actions_in_round(int max_raises) {
+    return max_raises + 2;
 }
 
 }

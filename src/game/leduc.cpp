@@ -45,9 +45,9 @@ bool public_card_dealt(const ParsedRounds& parsed) {
 std::array<int, 2> leduc_contributions(const State& state) {
     std::array<int, 2> contribution = {kLeducAnte, kLeducAnte};
     ParsedRounds parsed = parse_rounds(state);
-    apply_round_contributions(parsed.round[0], kRound1Bet, contribution);
+    apply_round_contributions(parsed.round(0), kRound1Bet, contribution);
     if (public_card_dealt(parsed)) {
-        apply_round_contributions(parsed.round[1], kRound2Bet, contribution);
+        apply_round_contributions(parsed.round(1), kRound2Bet, contribution);
     }
     return contribution;
 }
@@ -60,14 +60,14 @@ bool LeducGame::is_chance(const State& state) const {
     if (state.private_cards[0] == -1 || state.private_cards[1] == -1) return true;
     ParsedRounds parsed = parse_rounds(state);
     if (public_card_dealt(parsed)) return false;
-    return round_closed(parsed.round[0]);
+    return round_closed(parsed.round(0));
 }
 
 bool LeducGame::is_terminal(const State& state) const {
     if (is_chance(state)) return false;
     ParsedRounds parsed = parse_rounds(state);
-    if (!public_card_dealt(parsed)) return folded(parsed.round[0]);
-    return folded(parsed.round[1]) || round_closed(parsed.round[1]);
+    if (!public_card_dealt(parsed)) return folded(parsed.round(0));
+    return folded(parsed.round(1)) || round_closed(parsed.round(1));
 }
 
 Player LeducGame::current_player(const State& state) const {
@@ -92,7 +92,7 @@ State LeducGame::apply_action(const State& state, Action action) const {
 double LeducGame::terminal_utility(const State& state, Player player) const {
     std::array<int, 2> contribution = leduc_contributions(state);
     ParsedRounds parsed = parse_rounds(state);
-    const std::vector<Action>& final_round = active_round_actions(parsed);
+    std::span<const Action> final_round = active_round_actions(parsed);
 
     if (folded(final_round)) {
         Player folder = static_cast<Player>((final_round.size() - 1) % 2);
@@ -112,9 +112,9 @@ InfoSetKey LeducGame::infoset_label(const State& state) const {
         key += "|" + card_name(state.public_cards[0]);
     }
     key += ":";
-    for (Action action : parsed.round[0]) key += action_name(action) + ",";
+    for (Action action : parsed.round(0)) key += action_name(action) + ",";
     key += ";";
-    for (Action action : parsed.round[1]) key += action_name(action) + ",";
+    for (Action action : parsed.round(1)) key += action_name(action) + ",";
     return key;
 }
 
@@ -130,12 +130,12 @@ std::uint32_t LeducGame::infoset_index(const State& state) const {
     int private_rank = card_rank(state.private_cards[player]);
 
     if (!public_card_dealt(parsed)) {
-        int round1_stage = round_progress(parsed.round[0]);
+        int round1_stage = round_progress(parsed.round(0));
         return static_cast<std::uint32_t>(round1_stage * kLeducCardRankCount + private_rank);
     }
 
-    int round1_ending = round_progress(parsed.round[0]) - 1;
-    int round2_stage = round_progress(parsed.round[1]);
+    int round1_ending = round_progress(parsed.round(0)) - 1;
+    int round2_stage = round_progress(parsed.round(1));
     int public_rank = card_rank(state.public_cards[0]);
 
     int round2_offset =

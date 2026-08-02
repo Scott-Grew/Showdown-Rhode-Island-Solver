@@ -62,7 +62,7 @@ private:
     RihCardVector terminal_value(const State& state, const RihCardVector& opponent_reach,
                                   const BoardRanks* ranks) const {
         ParsedRounds parsed = parse_rounds(state);
-        const std::vector<Action>& final_round = active_round_actions(parsed);
+        std::span<const Action> final_round = active_round_actions(parsed);
         std::array<int, 2> contribution = rih_contributions(state);
         double board_multiplicity = undealt_board_multiplicity(state);
         RihCardVector value{};

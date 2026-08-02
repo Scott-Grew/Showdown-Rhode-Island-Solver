@@ -26,9 +26,9 @@ std::string rih_card_name(int card) {
 std::array<int, 2> rih_contributions(const State& state) {
     std::array<int, 2> contribution = {kRihAnte, kRihAnte};
     ParsedRounds parsed = parse_rounds(state);
-    apply_round_contributions(parsed.round[0], kRihRound1Bet, contribution);
-    if (parsed.board_cards_dealt >= 1) apply_round_contributions(parsed.round[1], kRihRound2Bet, contribution);
-    if (parsed.board_cards_dealt >= 2) apply_round_contributions(parsed.round[2], kRihRound3Bet, contribution);
+    apply_round_contributions(parsed.round(0), kRihRound1Bet, contribution);
+    if (parsed.board_cards_dealt >= 1) apply_round_contributions(parsed.round(1), kRihRound2Bet, contribution);
+    if (parsed.board_cards_dealt >= 2) apply_round_contributions(parsed.round(2), kRihRound3Bet, contribution);
     return contribution;
 }
 
@@ -120,7 +120,7 @@ bool RhodeIslandGame::is_chance(const State& state) const {
 bool RhodeIslandGame::is_terminal(const State& state) const {
     if (is_chance(state)) return false;
     ParsedRounds parsed = parse_rounds(state);
-    const std::vector<Action>& active = active_round_actions(parsed);
+    std::span<const Action> active = active_round_actions(parsed);
     if (parsed.board_cards_dealt < 2) return folded(active);
     return folded(active) || round_closed(active);
 }
@@ -147,7 +147,7 @@ State RhodeIslandGame::apply_action(const State& state, Action action) const {
 double RhodeIslandGame::terminal_utility(const State& state, Player player) const {
     std::array<int, 2> contribution = rih_contributions(state);
     ParsedRounds parsed = parse_rounds(state);
-    const std::vector<Action>& final_round = active_round_actions(parsed);
+    std::span<const Action> final_round = active_round_actions(parsed);
 
     if (folded(final_round)) {
         Player folder = static_cast<Player>((final_round.size() - 1) % 2);
@@ -166,11 +166,11 @@ InfoSetKey RhodeIslandGame::infoset_label(const State& state) const {
         key += "|" + rih_card_name(state.public_cards[index]);
     }
     key += ":";
-    for (Action action : parsed.round[0]) key += action_name(action) + ",";
+    for (Action action : parsed.round(0)) key += action_name(action) + ",";
     key += ";";
-    for (Action action : parsed.round[1]) key += action_name(action) + ",";
+    for (Action action : parsed.round(1)) key += action_name(action) + ",";
     key += ";";
-    for (Action action : parsed.round[2]) key += action_name(action) + ",";
+    for (Action action : parsed.round(2)) key += action_name(action) + ",";
     return key;
 }
 
@@ -191,21 +191,21 @@ std::uint32_t RhodeIslandGame::infoset_index(const State& state) const {
     std::uint32_t round2_base = round1_base + kRihRoundStageCount * kRihRoundStageCount * tables.pair_count;
 
     if (parsed.board_cards_dealt == 0) {
-        std::uint32_t round1_progress = static_cast<std::uint32_t>(round_progress(parsed.round[0]));
+        std::uint32_t round1_progress = static_cast<std::uint32_t>(round_progress(parsed.round(0)));
         return round1_progress * kRankCount + static_cast<std::uint32_t>(card_rank(static_cast<Card>(private_card)));
     }
 
     std::uint32_t board_card0 = static_cast<std::uint32_t>(state.public_cards[0]);
-    std::uint32_t round1_ending = static_cast<std::uint32_t>(round_progress(parsed.round[0]));
+    std::uint32_t round1_ending = static_cast<std::uint32_t>(round_progress(parsed.round(0)));
 
     if (parsed.board_cards_dealt == 1) {
-        std::uint32_t round2_progress = static_cast<std::uint32_t>(round_progress(parsed.round[1]));
+        std::uint32_t round2_progress = static_cast<std::uint32_t>(round_progress(parsed.round(1)));
         std::uint32_t pair_class = tables.pair_class[private_card * kRihDeckSize + board_card0];
         return round1_base + (round1_ending * kRihRoundStageCount + round2_progress) * tables.pair_count + pair_class;
     }
 
-    std::uint32_t round2_ending = static_cast<std::uint32_t>(round_progress(parsed.round[1]));
-    std::uint32_t round3_progress = static_cast<std::uint32_t>(round_progress(parsed.round[2]));
+    std::uint32_t round2_ending = static_cast<std::uint32_t>(round_progress(parsed.round(1)));
+    std::uint32_t round3_progress = static_cast<std::uint32_t>(round_progress(parsed.round(2)));
     std::uint32_t board_card1 = static_cast<std::uint32_t>(state.public_cards[1]);
     std::uint32_t triple_class =
         tables.triple_class[(private_card * kRihDeckSize + board_card0) * kRihDeckSize + board_card1];
