@@ -52,7 +52,7 @@ public:
         }
 
         if (thread_count == 1) {
-            run_iteration_range(iteration_count, *contexts_[0]);
+            run_iteration_range<false>(iteration_count, *contexts_[0]);
         } else {
             std::vector<std::thread> workers;
             workers.reserve(static_cast<std::size_t>(thread_count));
@@ -61,7 +61,7 @@ public:
             for (int index = 0; index < thread_count; ++index) {
                 int share = base_share + (index < remainder ? 1 : 0);
                 workers.emplace_back([this, share, index] {
-                    run_iteration_range(share, *contexts_[static_cast<std::size_t>(index)]);
+                    run_iteration_range<true>(share, *contexts_[static_cast<std::size_t>(index)]);
                 });
             }
             for (std::thread& worker : workers) worker.join();
@@ -149,11 +149,21 @@ private:
         return snapshot;
     }
 
+    template <bool Concurrent>
     void run_iteration_range(int iteration_count, TraversalContext& context) {
         for (int i = 0; i < iteration_count; ++i) {
             for (game::Player traverser = 0; traverser < 2; ++traverser) {
-                traverse(game_.initial_state(), traverser, context);
+                traverse<Concurrent>(game_.initial_state(), traverser, context);
             }
+        }
+    }
+
+    template <bool Concurrent>
+    static void accumulate(std::atomic<double>& slot, double increment) {
+        if constexpr (Concurrent) {
+            slot.fetch_add(increment, std::memory_order_relaxed);
+        } else {
+            slot.store(slot.load(std::memory_order_relaxed) + increment, std::memory_order_relaxed);
         }
     }
 
@@ -167,6 +177,7 @@ private:
         return distribution.size() - 1;
     }
 
+    template <bool Concurrent>
     double traverse(const game::State& state, game::Player traverser, TraversalContext& context) {
         if (game_.is_terminal(state)) return game_.terminal_utility(state, traverser);
 
@@ -175,7 +186,7 @@ private:
             std::vector<double> probabilities(outcomes.size());
             for (std::size_t i = 0; i < outcomes.size(); ++i) probabilities[i] = outcomes[i].second;
             std::size_t sampled = sample_index(probabilities, context.random_engine);
-            return traverse(game_.apply_action(state, outcomes[sampled].first), traverser, context);
+            return traverse<Concurrent>(game_.apply_action(state, outcomes[sampled].first), traverser, context);
         }
 
         game::Player acting_player = game_.current_player(state);
@@ -192,23 +203,23 @@ private:
         if (acting_player != traverser) {
             ++context.opponent_node_visits;
             for (std::size_t i = 0; i < actions.size(); ++i) {
-                strategy_sums_[offset + i].fetch_add(strategy[i], std::memory_order_relaxed);
+                accumulate<Concurrent>(strategy_sums_[offset + i], strategy[i]);
             }
             std::size_t sampled = sample_index(std::span<const double>(strategy.data(), actions.size()),
                                                 context.random_engine);
-            return traverse(game_.apply_action(state, actions[sampled]), traverser, context);
+            return traverse<Concurrent>(game_.apply_action(state, actions[sampled]), traverser, context);
         }
 
         std::array<double, detail::kMaxActionsPerInfoset> action_value{};
         double node_value = 0.0;
         for (std::size_t i = 0; i < actions.size(); ++i) {
-            action_value[i] = traverse(game_.apply_action(state, actions[i]), traverser, context);
+            action_value[i] = traverse<Concurrent>(game_.apply_action(state, actions[i]), traverser, context);
             node_value += strategy[i] * action_value[i];
         }
         double weighted_residual = 0.0;
         for (std::size_t i = 0; i < actions.size(); ++i) {
             weighted_residual += strategy[i] * (action_value[i] - node_value);
-            cumulative_regrets_[offset + i].fetch_add(action_value[i] - node_value, std::memory_order_relaxed);
+            accumulate<Concurrent>(cumulative_regrets_[offset + i], action_value[i] - node_value);
         }
         assert(std::abs(weighted_residual) < 1e-6);
         static_cast<void>(weighted_residual);
