@@ -1,7 +1,8 @@
-.PHONY: build test verify-discovery asan clean
+.PHONY: build test verify-discovery asan tsan clean
 
 RELEASE_DIR := .build/release
 ASAN_DIR := .build/asan
+TSAN_DIR := .build/tsan
 
 build:
 	cmake -B $(RELEASE_DIR) -DCMAKE_BUILD_TYPE=Release
@@ -24,6 +25,11 @@ asan:
 	cmake -B $(ASAN_DIR) -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
 	cmake --build $(ASAN_DIR)
 	ctest --test-dir $(ASAN_DIR) --output-on-failure
+
+tsan:
+	cmake -B $(TSAN_DIR) -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=thread" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+	cmake --build $(TSAN_DIR)
+	ctest --test-dir $(TSAN_DIR) --output-on-failure
 
 clean:
 	rm -rf .build .deps
