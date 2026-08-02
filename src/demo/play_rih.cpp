@@ -19,7 +19,7 @@ constexpr Player kSolver = 1;
 
 std::string action_prompt(Action action, const State& state) {
     ParsedRounds parsed = parse_rounds(state);
-    const std::vector<Action>& round_actions = active_round_actions(parsed);
+    std::span<const Action> round_actions = active_round_actions(parsed);
     bool facing_wager = !round_actions.empty() && round_actions.back() == kActionRaise;
     switch (action) {
         case kActionFold: return "fold";
