@@ -32,6 +32,11 @@ inline std::vector<double> average_from_sums(std::span<const double> strategy_su
     return strategy;
 }
 
+inline void regret_matching_in_place(std::span<double> strategy) {
+    for (double& value : strategy) value = std::max(value, 0.0);
+    normalize_or_uniform(strategy, 0.0);
+}
+
 void regret_matching_strategy_into(std::span<const double> cumulative_regrets, std::span<double> strategy);
 
 std::vector<double> regret_matching_strategy(std::span<const double> cumulative_regrets);
