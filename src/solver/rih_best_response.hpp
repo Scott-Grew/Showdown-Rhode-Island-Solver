@@ -24,8 +24,6 @@ double rih_strategy_value(const RihStrategyQuery& profile, game::Player player);
 double rih_best_response_value_in_round(const RihStrategyQuery& opponent_strategy, game::Player responder,
                                          int round);
 
-double rih_exploitability(const RihStrategyQuery& profile);
-
 template <typename AverageStrategySource, typename GameT>
 requires game::GameLike<GameT>
 RihStrategyQuery rih_average_strategy_query(const AverageStrategySource& source, const GameT& game) {
