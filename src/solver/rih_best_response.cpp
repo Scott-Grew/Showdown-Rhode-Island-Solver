@@ -222,8 +222,4 @@ double rih_best_response_value_in_round(const RihStrategyQuery& opponent_strateg
     return walk_root(opponent_strategy, responder, true, round);
 }
 
-double rih_exploitability(const RihStrategyQuery& profile) {
-    return (rih_best_response_value(profile, 0) + rih_best_response_value(profile, 1)) / 2.0;
-}
-
 }

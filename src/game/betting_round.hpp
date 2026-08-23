@@ -161,8 +161,4 @@ constexpr int max_history_depth(int rounds, int max_raises, int chance_events) {
     return rounds * (max_raises + 2) + chance_events;
 }
 
-constexpr int max_actions_in_round(int max_raises) {
-    return max_raises + 2;
-}
-
 }

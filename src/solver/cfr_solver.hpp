@@ -1,16 +1,10 @@
 #pragma once
 
-#include <algorithm>
 #include <array>
-#include <bit>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
-#include <numeric>
 #include <span>
-#include <stdexcept>
-#include <string>
 #include <vector>
 
 #include "game/game.hpp"
@@ -21,34 +15,7 @@ namespace cfr::solver {
 
 namespace detail {
 
-inline constexpr char kCheckpointHeader[] = "CFR_CHECKPOINT_V3";
 inline constexpr std::size_t kMaxActionsPerInfoset = 64;
-
-inline void write_table(std::ostream& output, const std::vector<double>& table) {
-    for (double value : table) {
-        output << std::hex << std::bit_cast<std::uint64_t>(value) << std::dec << '\n';
-    }
-    if (!output) throw std::runtime_error("cfr checkpoint: write failed inside table");
-}
-
-inline std::vector<double> read_table(std::istream& input, std::size_t value_count) {
-    std::vector<double> table(value_count);
-    for (std::size_t i = 0; i < value_count; ++i) {
-        std::uint64_t bits;
-        input >> std::hex >> bits >> std::dec;
-        if (!input) throw std::runtime_error("cfr checkpoint: truncated inside table");
-        table[i] = std::bit_cast<double>(bits);
-    }
-    return table;
-}
-
-inline void expect_token(std::istream& input, const std::string& expected) {
-    std::string token;
-    input >> token;
-    if (token != expected) {
-        throw std::runtime_error("cfr checkpoint: expected '" + expected + "', found '" + token + "'");
-    }
-}
 
 template <typename GameT, typename StrategyFromStored>
 requires game::LabelledGame<GameT>
@@ -112,12 +79,8 @@ public:
     void run_iterations(int iteration_count);
 
     StrategyProfile average_strategy() const;
-    StrategyProfile current_strategy() const;
 
     int iterations_run() const;
-
-    void save_checkpoint(const std::string& path) const;
-    static CfrSolver load_checkpoint(const GameT& game, const std::string& path);
 
 private:
 
@@ -217,16 +180,6 @@ void CfrSolver<Rules, GameT>::run_iterations(int iteration_count) {
 
 template <typename Rules, typename GameT>
 requires game::GameLike<GameT>
-StrategyProfile CfrSolver<Rules, GameT>::current_strategy() const {
-    StrategyProfile profile;
-    detail::collect_strategy_profile(game_, game_.initial_state(), cumulative_regrets_, kStride,
-                                      [](std::span<const double> stored) { return regret_matching_strategy(stored); },
-                                      profile);
-    return profile;
-}
-
-template <typename Rules, typename GameT>
-requires game::GameLike<GameT>
 StrategyProfile CfrSolver<Rules, GameT>::average_strategy() const {
     StrategyProfile profile;
     detail::collect_strategy_profile(game_, game_.initial_state(), strategy_sums_, kStride, average_from_sums,
@@ -238,68 +191,6 @@ template <typename Rules, typename GameT>
 requires game::GameLike<GameT>
 int CfrSolver<Rules, GameT>::iterations_run() const {
     return iteration_;
-}
-
-template <typename Rules, typename GameT>
-requires game::GameLike<GameT>
-void CfrSolver<Rules, GameT>::save_checkpoint(const std::string& path) const {
-    std::ofstream output(path);
-    if (!output) {
-        throw std::runtime_error("cfr checkpoint: could not open '" + path + "' for writing");
-    }
-
-    output << detail::kCheckpointHeader << '\n';
-    output << "policy " << Rules::kPolicyName << '\n';
-    output << "iteration " << iteration_ << '\n';
-    output << "infoset_count " << game_.infoset_count() << '\n';
-    output << "regrets\n";
-    detail::write_table(output, cumulative_regrets_);
-    output << "strategy_sums\n";
-    detail::write_table(output, strategy_sums_);
-    output.flush();
-    if (!output) throw std::runtime_error("cfr checkpoint: write to '" + path + "' failed, checkpoint is incomplete");
-}
-
-template <typename Rules, typename GameT>
-requires game::GameLike<GameT>
-CfrSolver<Rules, GameT> CfrSolver<Rules, GameT>::load_checkpoint(const GameT& game, const std::string& path) {
-    std::ifstream input(path);
-    if (!input) {
-        throw std::runtime_error("cfr checkpoint: could not open '" + path + "' for reading");
-    }
-
-    detail::expect_token(input, detail::kCheckpointHeader);
-    detail::expect_token(input, "policy");
-    detail::expect_token(input, Rules::kPolicyName);
-
-    detail::expect_token(input, "iteration");
-    int iteration;
-    input >> iteration;
-    if (!input) throw std::runtime_error("cfr checkpoint: truncated header");
-
-    detail::expect_token(input, "infoset_count");
-    std::uint32_t infoset_count;
-    input >> infoset_count;
-    if (!input) throw std::runtime_error("cfr checkpoint: truncated header");
-    if (infoset_count != game.infoset_count()) {
-        throw std::runtime_error("cfr checkpoint: infoset_count mismatch (checkpoint has " +
-                                  std::to_string(infoset_count) + ", game has " +
-                                  std::to_string(game.infoset_count()) + ")");
-    }
-
-    std::size_t value_count = static_cast<std::size_t>(infoset_count) * kStride;
-
-    detail::expect_token(input, "regrets");
-    std::vector<double> cumulative_regrets = detail::read_table(input, value_count);
-
-    detail::expect_token(input, "strategy_sums");
-    std::vector<double> strategy_sums = detail::read_table(input, value_count);
-
-    CfrSolver solver(game);
-    solver.iteration_ = iteration;
-    solver.cumulative_regrets_ = std::move(cumulative_regrets);
-    solver.strategy_sums_ = std::move(strategy_sums);
-    return solver;
 }
 
 template <typename GameT> using VanillaCfr = CfrSolver<VanillaRules, GameT>;

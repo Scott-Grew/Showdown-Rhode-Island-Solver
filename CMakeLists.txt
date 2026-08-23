@@ -43,7 +43,6 @@ add_library(cfr_eval_naive_ref STATIC
 target_include_directories(cfr_eval_naive_ref PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 add_library(cfr_solver STATIC
-    src/solver/strategy.cpp
     src/solver/best_response.cpp
     src/solver/rih_best_response.cpp
 )
