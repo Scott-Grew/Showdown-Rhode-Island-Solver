@@ -1,4 +1,3 @@
-# Inert until this repo gets a remote — no trigger wired to a live GitHub repo yet.
 name: ci
 
 on:
