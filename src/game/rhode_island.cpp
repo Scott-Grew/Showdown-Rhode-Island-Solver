@@ -9,7 +9,7 @@
 #include "eval/eval3.hpp"
 #include "game/betting_round.hpp"
 #include "game/card.hpp"
-#include "game/game_concept.hpp"
+#include "game/game.hpp"
 
 namespace cfr::game {
 

@@ -16,7 +16,6 @@
 #include <vector>
 
 #include "game/game.hpp"
-#include "game/game_concept.hpp"
 #include "solver/cfr_solver.hpp"
 #include "solver/strategy.hpp"
 

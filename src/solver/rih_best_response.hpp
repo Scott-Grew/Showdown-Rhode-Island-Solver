@@ -8,7 +8,6 @@
 
 #include "game/card.hpp"
 #include "game/game.hpp"
-#include "game/game_concept.hpp"
 
 namespace cfr::solver {
 

@@ -7,8 +7,8 @@
 #include <vector>
 
 #include "eval/eval3.hpp"
-#include "eval/naive_ref.hpp"
 #include "game/card.hpp"
+#include "naive_ref.hpp"
 
 using cfr::Card;
 using cfr::kCardCount;
