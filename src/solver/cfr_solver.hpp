@@ -8,7 +8,6 @@
 #include <vector>
 
 #include "game/game.hpp"
-#include "game/game_concept.hpp"
 #include "solver/strategy.hpp"
 
 namespace cfr::solver {

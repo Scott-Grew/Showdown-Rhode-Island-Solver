@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "game/card.hpp"
-#include "game/game_concept.hpp"
+#include "game/game.hpp"
 #include "game/rhode_island.hpp"
 #include "tree_walk.hpp"
 

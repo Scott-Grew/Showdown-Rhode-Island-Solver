@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "game/game_concept.hpp"
+#include "game/game.hpp"
 #include "game/kuhn.hpp"
 #include "game/leduc.hpp"
 
