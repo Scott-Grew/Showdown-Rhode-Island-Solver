@@ -11,18 +11,30 @@
 
 namespace cfr::solver {
 
+// One value per card id, read as the responder's or the opponent's
+// possible hole card.
 using RihCardVector = std::array<double, kCardCount>;
 
+// Fills probabilities_by_card[card * action_count + action] with
+// the actor's strategy at state for every hole card.
 using RihStrategyQuery =
     std::function<void(const game::State&, game::Player actor, std::vector<double>& probabilities_by_card)>;
 
+// Expected chips per hand the responder wins with a best
+// response to opponent_strategy.
 double rih_best_response_value(const RihStrategyQuery& opponent_strategy, game::Player responder);
 
+// Expected chips per hand for player when both sides follow
+// profile.
 double rih_strategy_value(const RihStrategyQuery& profile, game::Player player);
 
+// As rih_best_response_value, but the responder may deviate
+// only in the round with this many board cards dealt.
 double rih_best_response_value_in_round(const RihStrategyQuery& opponent_strategy, game::Player responder,
                                          int round);
 
+// Adapts a solver's average strategy to a RihStrategyQuery. The
+// result holds references to source and game.
 template <typename AverageStrategySource, typename GameT>
 requires game::GameLike<GameT>
 RihStrategyQuery rih_average_strategy_query(const AverageStrategySource& source, const GameT& game) {

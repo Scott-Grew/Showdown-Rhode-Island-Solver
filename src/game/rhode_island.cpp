@@ -16,6 +16,7 @@ namespace cfr::game {
 static_assert(GameLike<RhodeIslandGame>);
 static_assert(max_history_depth(3, kRihMaxRaisesPerRound, 4) <= static_cast<int>(kMaxHistory));
 
+// Rank character followed by suit character.
 std::string rih_card_name(int card) {
     static const char* const kRankNames[] = {"2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"};
     static const char* const kSuitNames[] = {"c", "d", "h", "s"};
@@ -23,6 +24,7 @@ std::string rih_card_name(int card) {
     return std::string(kRankNames[card_rank(typed_card)]) + kSuitNames[card_suit(typed_card)];
 }
 
+// Ante plus the bets of each round played so far.
 std::array<int, 2> rih_contributions(const State& state) {
     std::array<int, 2> contribution = {kRihAnte, kRihAnte};
     ParsedRounds parsed = parse_rounds(state);
@@ -34,6 +36,8 @@ std::array<int, 2> rih_contributions(const State& state) {
 
 namespace {
 
+// Winner by three-card hand rank over hole card plus board, or -1
+// on a tie.
 Player showdown_winner(const State& state) {
     std::array<Card, 3> hand0 = {static_cast<Card>(state.private_cards[0]), static_cast<Card>(state.public_cards[0]),
                                   static_cast<Card>(state.public_cards[1])};
@@ -45,8 +49,11 @@ Player showdown_winner(const State& state) {
     return rank0 > rank1 ? 0 : 1;
 }
 
+// Number of round_progress values under a cap of three raises.
 constexpr int kRihRoundStageCount = 8;
 
+// Card id with its suit renamed to the order suits first appear in
+// the hand, so hands equal up to a suit swap get equal keys.
 std::uint32_t relabelled(int card, std::array<int, kSuitCount>& suit_map, int& next_suit) {
     int suit = card_suit(static_cast<Card>(card));
     if (suit_map[static_cast<std::size_t>(suit)] < 0) suit_map[static_cast<std::size_t>(suit)] = next_suit++;
@@ -54,6 +61,8 @@ std::uint32_t relabelled(int card, std::array<int, kSuitCount>& suit_map, int& n
                                        suit_map[static_cast<std::size_t>(suit)]);
 }
 
+// Suit-isomorphism class of every ordered (hole, board) pair and
+// (hole, board, board) triple, indexed by raw card ids.
 struct SuitCanonicalTables {
     std::vector<std::uint32_t> pair_class;
     std::vector<std::uint32_t> triple_class;
@@ -61,6 +70,8 @@ struct SuitCanonicalTables {
     std::uint32_t triple_count = 0;
 };
 
+// Builds the class tables on first use; a function-local static,
+// so the build is thread-safe.
 const SuitCanonicalTables& canonical_tables() {
     static const SuitCanonicalTables tables = [] {
         SuitCanonicalTables built;
@@ -106,10 +117,13 @@ const SuitCanonicalTables& canonical_tables() {
 
 }
 
+// The empty state, before any card is dealt.
 State RhodeIslandGame::initial_state() const {
     return State{};
 }
 
+// True while a hole card is missing, or when a round has closed
+// and fewer than two board cards are out.
 bool RhodeIslandGame::is_chance(const State& state) const {
     if (state.private_cards[0] == -1 || state.private_cards[1] == -1) return true;
     ParsedRounds parsed = parse_rounds(state);
@@ -117,6 +131,8 @@ bool RhodeIslandGame::is_chance(const State& state) const {
     return round_closed(active_round_actions(parsed));
 }
 
+// A fold ends the hand in any round; otherwise it ends when
+// round 3 closes.
 bool RhodeIslandGame::is_terminal(const State& state) const {
     if (is_chance(state)) return false;
     ParsedRounds parsed = parse_rounds(state);
@@ -125,17 +141,21 @@ bool RhodeIslandGame::is_terminal(const State& state) const {
     return folded(active) || round_closed(active);
 }
 
+// Player to act in the active round, or -1 at a chance node.
 Player RhodeIslandGame::current_player(const State& state) const {
     if (is_chance(state)) return -1;
     ParsedRounds parsed = parse_rounds(state);
     return round_actor(active_round_actions(parsed));
 }
 
+// Legal actions of the active round under the raise cap.
 std::vector<Action> RhodeIslandGame::legal_actions(const State& state) const {
     ParsedRounds parsed = parse_rounds(state);
     return round_legal_actions(active_round_actions(parsed), kRihMaxRaisesPerRound);
 }
 
+// Appends the entry, and at a chance node also stores the card
+// decoded from action - kChanceCardOffset.
 State RhodeIslandGame::apply_action(const State& state, Action action) const {
     State next = state;
     bool dealing = is_chance(state);
@@ -144,6 +164,8 @@ State RhodeIslandGame::apply_action(const State& state, Action action) const {
     return next;
 }
 
+// A fold pays the other player; otherwise the showdown
+// decides, and a tie pays zero.
 double RhodeIslandGame::terminal_utility(const State& state, Player player) const {
     std::array<int, 2> contribution = rih_contributions(state);
     ParsedRounds parsed = parse_rounds(state);
@@ -157,6 +179,8 @@ double RhodeIslandGame::terminal_utility(const State& state, Player player) cons
     return settle(contribution, showdown_winner(state), player);
 }
 
+// Builds "P<player>:<hole>|<board>:<r1>;<r2>;<r3>" with full card
+// names, so labels are finer than the suit-canonical index.
 InfoSetKey RhodeIslandGame::infoset_label(const State& state) const {
     Player player = current_player(state);
     ParsedRounds parsed = parse_rounds(state);
@@ -174,6 +198,7 @@ InfoSetKey RhodeIslandGame::infoset_label(const State& state) const {
     return key;
 }
 
+// Rows of all three rounds; infoset_index has the layout.
 std::uint32_t RhodeIslandGame::infoset_count() const {
     const SuitCanonicalTables& tables = canonical_tables();
     return kRihRoundStageCount * kRankCount +
@@ -181,6 +206,8 @@ std::uint32_t RhodeIslandGame::infoset_count() const {
            kRihRoundStageCount * kRihRoundStageCount * kRihRoundStageCount * tables.triple_count;
 }
 
+// Round 1 rows key on progress and rank. Later rounds key on how
+// earlier rounds ended, progress, and the suit class of the cards.
 std::uint32_t RhodeIslandGame::infoset_index(const State& state) const {
     Player player = current_player(state);
     ParsedRounds parsed = parse_rounds(state);
@@ -215,6 +242,7 @@ std::uint32_t RhodeIslandGame::infoset_index(const State& state) const {
            triple_class;
 }
 
+// Uniform over the undealt cards of the 52-card deck.
 std::vector<std::pair<Action, double>> RhodeIslandGame::chance_outcomes(const State& state) const {
     return deal_outcomes(state, kRihDeckSize);
 }

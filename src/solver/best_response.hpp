@@ -14,10 +14,15 @@ namespace cfr::solver {
 
 namespace detail {
 
+// Every responder state of an infoset with the probability that
+// chance and the opponent lead to it.
 using StatesByInfoset = std::map<game::InfoSetKey, std::vector<std::pair<game::State, double>>>;
 
+// Best-response value already computed per infoset.
 using BestResponseMemo = std::map<game::InfoSetKey, double>;
 
+// The opponent's strategy at state, or uniform when the profile
+// has no entry for that infoset.
 template <typename GameT>
 std::vector<double> opponent_action_probabilities(const GameT& game, const game::State& state,
                                                     const StrategyProfile& opponent_strategy,
@@ -31,8 +36,11 @@ std::vector<double> opponent_action_probabilities(const GameT& game, const game:
     return std::vector<double>(actions.size(), 1.0 / static_cast<double>(actions.size()));
 }
 
+// Infosets with total reach at or below this get value zero.
 constexpr double kUnreachableInfosetWeightEpsilon = 1e-12;
 
+// Groups the responder's decision states by infoset. reach_weight
+// multiplies chance and opponent probabilities only.
 template <typename GameT>
 void collect_responder_states(const GameT& game, const game::State& state, double reach_weight,
                                const StrategyProfile& opponent_strategy, game::Player responder,
@@ -66,10 +74,14 @@ void collect_responder_states(const GameT& game, const game::State& state, doubl
     }
 }
 
+// Declared early because it and best_response_value_at call each
+// other.
 template <typename GameT>
 double node_value(const GameT& game, const game::State& state, const StrategyProfile& opponent_strategy,
                    game::Player responder, const StatesByInfoset& states_by_infoset, BestResponseMemo& memo);
 
+// Value per unit of reach of the best single action at an infoset,
+// chosen jointly for all states the responder cannot tell apart.
 template <typename GameT>
 double best_response_value_at(const GameT& game, const game::InfoSetKey& infoset_label,
                                const StrategyProfile& opponent_strategy, game::Player responder,
@@ -97,6 +109,8 @@ double best_response_value_at(const GameT& game, const game::InfoSetKey& infoset
     return normalized_best_value;
 }
 
+// Expected responder value below state when the responder plays a
+// best response and the opponent follows the profile.
 template <typename GameT>
 double node_value(const GameT& game, const game::State& state, const StrategyProfile& opponent_strategy,
                    game::Player responder, const StatesByInfoset& states_by_infoset, BestResponseMemo& memo) {
@@ -132,6 +146,8 @@ double node_value(const GameT& game, const game::State& state, const StrategyPro
 
 }
 
+// Expected chips the responder wins per hand with a best response
+// to opponent_strategy. Walks the full tree, so small games only.
 template <typename GameT>
 requires game::LabelledGame<GameT>
 double best_response_value(const GameT& game, const StrategyProfile& opponent_strategy, game::Player responder) {
@@ -142,6 +158,8 @@ double best_response_value(const GameT& game, const StrategyProfile& opponent_st
     return detail::node_value(game, game.initial_state(), opponent_strategy, responder, states_by_infoset, memo);
 }
 
+// Mean of the two best-response values; zero exactly at a Nash
+// equilibrium of a zero-sum game.
 template <typename GameT>
 requires game::LabelledGame<GameT>
 double exploitability(const GameT& game, const StrategyProfile& profile) {

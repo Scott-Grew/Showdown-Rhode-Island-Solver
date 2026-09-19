@@ -14,9 +14,12 @@ using Player = int;
 using Action = int;
 using InfoSetKey = std::string;
 
+// Fixed capacities of the State arrays below.
 inline constexpr std::size_t kMaxHistory = 32;
 inline constexpr std::size_t kMaxPublic = 2;
 
+// One node of a game tree. A card slot of -1 means not dealt yet,
+// and history holds chance and betting entries in play order.
 struct State {
     std::array<std::int8_t, 2> private_cards{-1, -1};
     std::array<std::int8_t, kMaxPublic> public_cards{-1, -1};
@@ -25,6 +28,8 @@ struct State {
     std::uint8_t history_len = 0;
 };
 
+// What a solver needs from a game. infoset_index must be below
+// infoset_count and equal for states the actor cannot tell apart.
 template <typename CandidateGame>
 concept GameLike = requires(const CandidateGame game, const State state, Action action, Player player) {
     { game.initial_state() } -> std::same_as<State>;
@@ -40,6 +45,8 @@ concept GameLike = requires(const CandidateGame game, const State state, Action 
     { CandidateGame::kMaxActions } -> std::convertible_to<std::size_t>;
 };
 
+// A game that can also name each infoset as text, which
+// StrategyProfile and the tree-walking best response key on.
 template <typename CandidateGame>
 concept LabelledGame = GameLike<CandidateGame> && requires(const CandidateGame game, const State state) {
     { game.infoset_label(state) } -> std::same_as<InfoSetKey>;

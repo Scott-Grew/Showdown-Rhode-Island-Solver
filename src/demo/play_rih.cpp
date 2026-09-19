@@ -14,9 +14,12 @@ using namespace cfr::game;
 
 namespace {
 
+// Seats: the human acts first in every round.
 constexpr Player kHuman = 0;
 constexpr Player kSolver = 1;
 
+// Word shown for an action: check and bet when no bet is faced,
+// call and raise otherwise.
 std::string action_prompt(Action action, const State& state) {
     ParsedRounds parsed = parse_rounds(state);
     std::span<const Action> round_actions = active_round_actions(parsed);
@@ -29,6 +32,8 @@ std::string action_prompt(Action action, const State& state) {
     return "?";
 }
 
+// Prints the human's card, the board and the pot, plus the
+// solver's card when asked.
 void show_table(const State& state, bool reveal_solver_hole) {
     std::cout << "\n  your card " << rih_card_name(state.private_cards[kHuman]);
     if (state.public_count > 0) {
@@ -42,6 +47,8 @@ void show_table(const State& state, bool reveal_solver_hole) {
     std::cout << "   pot " << contribution[0] + contribution[1] << "\n";
 }
 
+// Reads a legal move by name from stdin; end of input returns a
+// fold and leaves std::cin failed.
 Action ask_human(const RhodeIslandGame& game, const State& state) {
     std::vector<Action> actions = game.legal_actions(state);
     while (true) {
@@ -61,8 +68,10 @@ Action ask_human(const RhodeIslandGame& game, const State& state) {
     }
 }
 
+// Strategy lookup: state and action count to probabilities.
 using ActionProbabilities = std::function<std::vector<double>(const State&, std::size_t)>;
 
+// Samples the solver's action from its strategy at state.
 Action solver_move(const RhodeIslandGame& game, const State& state, const ActionProbabilities& strategy,
                     std::mt19937_64& random_engine) {
     std::vector<Action> actions = game.legal_actions(state);
@@ -78,6 +87,8 @@ Action solver_move(const RhodeIslandGame& game, const State& state, const Action
 
 }
 
+// Plays hands against a checkpoint given as argv[1], or against
+// the published equilibrium when no argument is given.
 int main(int argc, char** argv) {
     RhodeIslandGame game;
     ActionProbabilities strategy;
