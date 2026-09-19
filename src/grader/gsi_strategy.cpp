@@ -11,31 +11,42 @@ namespace cfr::grader {
 
 namespace {
 
+// Key ranges taken by rounds 1 and 2; later rounds start above.
 constexpr int kGsiRound1KeySpan = kGsiRound1ClassCount * kGsiSlotsPerKey;
 constexpr int kGsiRound2KeySpan = kGsiRound2ClassCount * kGsiSequencesPerRound * kGsiSlotsPerKey;
 
+// Slot range of a row per decision type: no bet faced, then
+// facing the first, second or third raise.
 constexpr std::array<std::pair<int, int>, 4> kSlotRanges = {
     std::pair<int, int>{0, 2}, {2, 5}, {5, 8}, {8, 10}};
 
+// GSI numbers cards suit-major: suit * 13 + rank.
 int gsi_card(Card card) {
     return card_suit(card) * kRankCount + card_rank(card);
 }
 
+// Signal-tree node of a lone hole card; node 0 is the root.
 int signal_index(int hole) {
     return 1 + hole;
 }
 
+// Node of a hole card plus first board card. The board index skips
+// the hole card, leaving 51 values.
 int signal_index(int hole, int board0) {
     int shifted_board = board0 > hole ? board0 - 1 : board0;
     return kCardCount + kCardCount * shifted_board + signal_index(hole);
 }
 
+// Node of a full deal. The second board index skips both earlier
+// cards; 2652 = 52 * 51 pairs sit on the level above.
 int signal_index(int hole, int board0, int board1) {
     int lower_cards = (hole < board1 ? 1 : 0) + (board0 < board1 ? 1 : 0);
     int shifted_board = board1 - lower_cards;
     return 2704 + 2652 * shifted_board + (signal_index(hole, board0) - kCardCount);
 }
 
+// GSI id of a closed round's betting: the raise count when it
+// opened with a check, the raise count plus 3 otherwise.
 int gsi_sequence(std::span<const game::Action> round_actions) {
     int raises_used =
         static_cast<int>(std::count(round_actions.begin(), round_actions.end(), game::kActionRaise));
@@ -43,6 +54,7 @@ int gsi_sequence(std::span<const game::Action> round_actions) {
     return opened_with_check ? raises_used : raises_used + 3;
 }
 
+// 0 when no bet is faced, otherwise the number of raises so far.
 int decision_type(std::span<const game::Action> round_actions) {
     if (round_actions.empty() || round_actions.back() != game::kActionRaise) return 0;
     return static_cast<int>(std::count(round_actions.begin(), round_actions.end(), game::kActionRaise));
@@ -50,6 +62,7 @@ int decision_type(std::span<const game::Action> round_actions) {
 
 }
 
+// What both players can see at a state, in GSI numbering.
 struct GsiStrategy::PublicContext {
     int board0 = -1;
     int board1 = -1;
@@ -60,6 +73,7 @@ struct GsiStrategy::PublicContext {
     game::Player actor = 0;
 };
 
+// Extracts board cards, betting sequences and the actor.
 GsiStrategy::PublicContext GsiStrategy::public_context(const game::State& state) {
     game::ParsedRounds parsed = game::parse_rounds(state);
     std::span<const game::Action> round_actions = game::active_round_actions(parsed);
@@ -79,6 +93,8 @@ GsiStrategy::PublicContext GsiStrategy::public_context(const game::State& state)
     return context;
 }
 
+// Row key in a player file. Keys are 1-based, classes are numbered
+// across rounds, and each round's keys follow the previous one's.
 std::uint32_t GsiStrategy::key_for(const PublicContext& context, int hole) const {
     if (context.board_cards_dealt == 0) {
         int class_id = signal_class_[static_cast<std::size_t>(signal_index(hole))];
@@ -100,6 +116,8 @@ std::uint32_t GsiStrategy::key_for(const PublicContext& context, int hole) const
         kGsiRound2KeySpan + 1);
 }
 
+// Writes the normalized probabilities of one decision to
+// destination, uniform when the key is absent or all zero.
 void GsiStrategy::write_slots(game::Player actor, std::uint32_t key, int decision_type, double* destination) const {
     auto [begin, end] = kSlotRanges[static_cast<std::size_t>(decision_type)];
     std::size_t action_count = static_cast<std::size_t>(end - begin);
@@ -121,6 +139,8 @@ void GsiStrategy::write_slots(game::Player actor, std::uint32_t key, int decisio
     for (std::size_t i = 0; i < action_count; ++i) destination[i] = 1.0 / static_cast<double>(action_count);
 }
 
+// Reads the partition in hole, board, board nesting order, then
+// both player files of key plus ten floats per row.
 GsiStrategy GsiStrategy::load(const std::string& directory) {
     GsiStrategy strategy;
 
@@ -164,6 +184,8 @@ GsiStrategy GsiStrategy::load(const std::string& directory) {
     return strategy;
 }
 
+// Strategy of the acting player at state, one entry per
+// legal action.
 std::vector<double> GsiStrategy::action_probabilities(const game::State& state) const {
     PublicContext context = public_context(state);
     auto [begin, end] = kSlotRanges[static_cast<std::size_t>(context.decision_type)];
@@ -173,6 +195,8 @@ std::vector<double> GsiStrategy::action_probabilities(const game::State& state) 
     return probabilities;
 }
 
+// Strategy of actor at state for every hole card, laid out
+// as card * action_count + action. Board cards stay zero.
 void GsiStrategy::action_probabilities_by_card(const game::State& state, game::Player actor,
                                                 std::vector<double>& probabilities_by_card) const {
     PublicContext context = public_context(state);

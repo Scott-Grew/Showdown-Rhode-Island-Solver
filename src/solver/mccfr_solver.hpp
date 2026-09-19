@@ -23,6 +23,8 @@ namespace cfr::solver {
 
 static_assert(std::atomic<double>::is_always_lock_free);
 
+// Seed for one worker: thread 0 keeps the seed, the others get a
+// splitmix64 mix of seed + index so their streams differ.
 inline std::uint64_t scrambled_seed(std::uint64_t seed, std::size_t thread_index) {
     if (thread_index == 0) return seed;
     std::uint64_t value = seed + thread_index + 0x9e3779b97f4a7c15ULL;
@@ -31,16 +33,22 @@ inline std::uint64_t scrambled_seed(std::uint64_t seed, std::size_t thread_index
     return value ^ (value >> 31);
 }
 
+// External-sampling MCCFR. Tables are atomic doubles shared by all
+// worker threads; the game is held by reference.
 template <typename GameT>
 requires game::GameLike<GameT>
 class ExternalSamplingSolver {
 public:
+    // Allocates zeroed tables; seed fixes every worker's random
+    // stream.
     ExternalSamplingSolver(const GameT& game, std::uint64_t seed)
         : game_(game),
           cumulative_regrets_(static_cast<std::size_t>(game.infoset_count()) * kStride),
           strategy_sums_(static_cast<std::size_t>(game.infoset_count()) * kStride),
           seed_(seed) {}
 
+    // Runs this many more iterations, split across thread_count
+    // threads; each thread keeps its random engine between calls.
     void run_iterations(int iteration_count, int thread_count = 1) {
         if (iteration_count < 0) throw std::invalid_argument("mccfr: iteration_count must not be negative");
         if (iteration_count == 0) return;
@@ -50,6 +58,7 @@ public:
             contexts_.push_back(std::make_unique<TraversalContext>(scrambled_seed(seed_, contexts_.size())));
         }
 
+        // One thread skips the atomic read-modify-write path.
         if (thread_count == 1) {
             run_iteration_range<false>(iteration_count, *contexts_[0]);
         } else {
@@ -68,20 +77,27 @@ public:
         iteration_ += iteration_count;
     }
 
+    // Iterations completed, including any loaded from a checkpoint.
     int iterations_run() const { return iteration_; }
 
+    // Sum of the whole strategy table; each opponent-node visit adds
+    // a distribution summing to 1.
     double strategy_mass() const {
         long double total = 0.0L;
         for (const std::atomic<double>& value : strategy_sums_) total += value.load(std::memory_order_relaxed);
         return static_cast<double>(total);
     }
 
+    // Opponent decision nodes visited by all workers since
+    // construction. Call only while no run is in flight.
     std::uint64_t opponent_node_visits() const {
         std::uint64_t total = 0;
         for (const std::unique_ptr<TraversalContext>& context : contexts_) total += context->opponent_node_visits;
         return total;
     }
 
+    // Writes one infoset's average strategy into the first
+    // action_count entries of strategy.
     void average_strategy_into(std::uint32_t infoset_index, std::size_t action_count,
                                 std::span<double> strategy) const {
         std::size_t offset = static_cast<std::size_t>(infoset_index) * kStride;
@@ -91,6 +107,8 @@ public:
         normalize_or_uniform(strategy.subspan(0, action_count));
     }
 
+    // Binary checkpoint in native layout: uint64 count, int
+    // iterations, then the sums as doubles. Regrets are not saved.
     void save_strategy_sums(const std::string& path) const {
         std::ofstream output(path, std::ios::binary);
         if (!output) throw std::runtime_error("mccfr: could not open '" + path + "' for writing");
@@ -104,6 +122,8 @@ public:
         if (!output) throw std::runtime_error("mccfr: write to '" + path + "' failed, strategy is incomplete");
     }
 
+    // Reads a checkpoint and rejects a wrong size, a truncated file
+    // or trailing bytes. Regrets stay as they were.
     void load_strategy_sums(const std::string& path) {
         std::ifstream input(path, std::ios::binary);
         if (!input) throw std::runtime_error("mccfr: could not open '" + path + "' for reading");
@@ -126,6 +146,7 @@ public:
         }
     }
 
+    // Average strategy of every reachable infoset, keyed by label.
     StrategyProfile average_strategy() const {
         StrategyProfile profile;
         std::vector<double> snapshot = table_snapshot(strategy_sums_);
@@ -136,18 +157,24 @@ public:
 private:
     static constexpr std::size_t kStride = GameT::kMaxActions;
 
+    // State owned by one worker thread: its random engine and its
+    // visit counter.
     struct TraversalContext {
+        // Seeds this worker's engine.
         explicit TraversalContext(std::uint64_t seed) : random_engine(seed) {}
         std::mt19937_64 random_engine;
         std::uint64_t opponent_node_visits = 0;
     };
 
+    // Plain copy of an atomic table, read slot by slot.
     static std::vector<double> table_snapshot(const std::vector<std::atomic<double>>& table) {
         std::vector<double> snapshot(table.size());
         for (std::size_t i = 0; i < table.size(); ++i) snapshot[i] = table[i].load(std::memory_order_relaxed);
         return snapshot;
     }
 
+    // Runs iterations on one context; an iteration is one traversal
+    // for each player.
     template <bool Concurrent>
     void run_iteration_range(int iteration_count, TraversalContext& context) {
         for (int i = 0; i < iteration_count; ++i) {
@@ -157,6 +184,8 @@ private:
         }
     }
 
+    // Adds to a slot: atomically when threads share the table, as a
+    // plain load and store when only one thread runs.
     template <bool Concurrent>
     static void accumulate(std::atomic<double>& slot, double increment) {
         if constexpr (Concurrent) {
@@ -166,6 +195,8 @@ private:
         }
     }
 
+    // Samples an index from a distribution summing to 1; the last
+    // index absorbs any rounding shortfall.
     static std::size_t sample_index(std::span<const double> distribution, std::mt19937_64& random_engine) {
         double roll = std::uniform_real_distribution<double>(0.0, 1.0)(random_engine);
         double cumulative = 0.0;
@@ -176,6 +207,8 @@ private:
         return distribution.size() - 1;
     }
 
+    // Value of state for the traverser. Chance and opponent nodes
+    // sample one child; traverser nodes try every action.
     template <bool Concurrent>
     double traverse(const game::State& state, game::Player traverser, TraversalContext& context) {
         if (game_.is_terminal(state)) return game_.terminal_utility(state, traverser);
@@ -199,6 +232,7 @@ private:
         }
         regret_matching_in_place(std::span<double>(strategy.data(), actions.size()));
 
+        // The opponent's current strategy feeds the average here.
         if (acting_player != traverser) {
             ++context.opponent_node_visits;
             for (std::size_t i = 0; i < actions.size(); ++i) {
@@ -215,6 +249,8 @@ private:
             action_value[i] = traverse<Concurrent>(game_.apply_action(state, actions[i]), traverser, context);
             node_value += strategy[i] * action_value[i];
         }
+        // Regrets weighted by the strategy sum to zero by
+        // construction; the assert checks that identity.
         double weighted_residual = 0.0;
         for (std::size_t i = 0; i < actions.size(); ++i) {
             weighted_residual += strategy[i] * (action_value[i] - node_value);
