@@ -1,3 +1,6 @@
+// The Rhode Island best-response walk over the public tree. See
+// rih_best_response.hpp for what the entry points return.
+
 #include "solver/rih_best_response.hpp"
 
 #include <algorithm>
@@ -14,7 +17,9 @@ namespace {
 using namespace cfr::game;
 
 // Ordered deals of two hole cards and two board cards.
-constexpr double kOrderedDealCount = 52.0 * 51.0 * 50.0 * 49.0;
+constexpr double kOrderedDealCount = static_cast<double>(kCardCount) *
+                                     (kCardCount - 1) * (kCardCount - 2) *
+                                     (kCardCount - 3);
 
 // Hand rank of every hole card on one full board, and the cards
 // sorted weakest first.
@@ -28,133 +33,190 @@ struct BoardRanks {
 BoardRanks rank_every_hole_card(int board0, int board1) {
     BoardRanks ranks;
     for (int card = 0; card < kCardCount; ++card) {
-        std::array<Card, 3> hand = {static_cast<Card>(card), static_cast<Card>(board0), static_cast<Card>(board1)};
+        std::array<Card, 3> hand = {static_cast<Card>(card),
+                                    static_cast<Card>(board0),
+                                    static_cast<Card>(board1)};
         ranks.hand_rank[card] = eval::evaluate_3card(hand.data());
         ranks.cards_by_rank[card] = card;
     }
     std::sort(ranks.cards_by_rank.begin(), ranks.cards_by_rank.end(),
-              [&ranks](int left, int right) { return ranks.hand_rank[left] < ranks.hand_rank[right]; });
+              [&ranks](int left, int right) {
+                  return ranks.hand_rank[left] < ranks.hand_rank[right];
+              });
     return ranks;
 }
+
+// Whether the responder picks its best action or follows the
+// strategy being evaluated.
+enum class ResponderPolicy { kFollowStrategy, kBestResponse };
+
+// Deviation round meaning the responder may deviate in any round.
+constexpr int kDeviateInEveryRound = -1;
 
 // Walks the public tree once, carrying a value per responder hole
 // card and a reach per opponent hole card.
 class BestResponseWalk {
 public:
-    // maximize false evaluates the profile itself; deviation_round
-    // of -1 lets the responder deviate in every round.
-    BestResponseWalk(const RihStrategyQuery& opponent_strategy, Player responder, bool maximize,
-                      int deviation_round)
-        : opponent_strategy_(opponent_strategy), responder_(responder), opponent_(1 - responder),
-          maximize_(maximize), deviation_round_(deviation_round) {}
+    // deviation_round limits a best response to the round with that
+    // many board cards dealt, or is kDeviateInEveryRound.
+    BestResponseWalk(const RihStrategyQuery& opponent_strategy,
+                     Player responder, ResponderPolicy policy,
+                     int deviation_round)
+        : opponent_strategy_(opponent_strategy),
+          responder_(responder),
+          opponent_(1 - responder),
+          maximize_(policy == ResponderPolicy::kBestResponse),
+          deviation_round_(deviation_round) {}
 
     // Summed responder value per hole card below state, over every
     // remaining deal. ranks is null until the board is full.
-    RihCardVector walk(const State& state, const RihCardVector& opponent_reach, const BoardRanks* ranks) {
-        if (game_.is_terminal(state)) return terminal_value(state, opponent_reach, ranks);
-        if (game_.is_chance(state)) return deal_board_card(state, opponent_reach);
-        if (game_.current_player(state) == responder_) return responder_node(state, opponent_reach, ranks);
+    RihCardVector walk(const State& state, const RihCardVector& opponent_reach,
+                       const BoardRanks* ranks) {
+        if (game_.is_terminal(state))
+            return terminal_value(state, opponent_reach, ranks);
+        if (game_.is_chance(state))
+            return deal_board_card(state, opponent_reach);
+        if (game_.current_player(state) == responder_)
+            return responder_node(state, opponent_reach, ranks);
         return opponent_node(state, opponent_reach, ranks);
     }
 
 private:
     // Zeroes entries of cards on the board; nobody can hold them.
     void clear_board_cards(const State& state, RihCardVector& value) const {
-        for (std::uint8_t index = 0; index < state.public_count; ++index) {
-            value[static_cast<std::size_t>(state.public_cards[index])] = 0.0;
+        for (std::uint8_t index = 0; index < state.board_count; ++index) {
+            value[static_cast<std::size_t>(state.board_cards[index])] = 0.0;
         }
     }
 
-    // Ordered board deals still to come, which weights a fold that
-    // ends the hand before the board is full.
+    // Ordered board deals still to come with both hole cards out,
+    // which weights a fold that ends the hand early.
     static double undealt_board_multiplicity(const State& state) {
-        if (state.public_count == 0) return 50.0 * 49.0;
-        if (state.public_count == 1) return 49.0;
+        if (state.board_count == 0) {
+            return (kCardCount - 2) * (kCardCount - 3);
+        }
+        if (state.board_count == 1) return kCardCount - 3;
         return 1.0;
     }
 
     // Responder payoff per hole card against the opponent's reach,
     // skipping the opponent holding the same card.
-    RihCardVector terminal_value(const State& state, const RihCardVector& opponent_reach,
-                                  const BoardRanks* ranks) const {
+    RihCardVector terminal_value(const State& state,
+                                 const RihCardVector& opponent_reach,
+                                 const BoardRanks* ranks) const {
         ParsedRounds parsed = parse_rounds(state);
         std::span<const Action> final_round = active_round_actions(parsed);
-        std::array<int, 2> contribution = rih_contributions(state);
-        double board_multiplicity = undealt_board_multiplicity(state);
-        RihCardVector value{};
+        std::array<int, 2> contributions = rih_contributions(state);
 
-        if (!final_round.empty() && final_round.back() == kActionFold) {
+        RihCardVector value;
+        if (folded(final_round)) {
             Player folder = static_cast<Player>((final_round.size() - 1) % 2);
-            int pot = contribution[0] + contribution[1];
-            double payoff = responder_ == 1 - folder ? static_cast<double>(pot - contribution[1 - folder])
-                                                      : -static_cast<double>(contribution[responder_]);
-            double total_reach = std::accumulate(opponent_reach.begin(), opponent_reach.end(), 0.0);
-            for (int card = 0; card < kCardCount; ++card) {
-                value[static_cast<std::size_t>(card)] =
-                    board_multiplicity * payoff *
-                    (total_reach - opponent_reach[static_cast<std::size_t>(card)]);
-            }
-            clear_board_cards(state, value);
-            return value;
+            value = fold_value(state, folder, contributions, opponent_reach);
+        } else {
+            double stake = static_cast<double>(contributions[responder_]);
+            value = showdown_value(stake, opponent_reach, *ranks);
         }
-
-        double stake = static_cast<double>(contribution[responder_]);
-        double weaker_reach = 0.0;
-        std::size_t position = 0;
-        double total_reach = std::accumulate(opponent_reach.begin(), opponent_reach.end(), 0.0);
-
-        // Sweep tie groups weakest first: a card wins the stake from
-        // all weaker reach and loses it to all stronger reach.
-        while (position < kCardCount) {
-            std::size_t tie_end = position;
-            eval::HandRank current = ranks->hand_rank[static_cast<std::size_t>(ranks->cards_by_rank[position])];
-            double tie_reach = 0.0;
-            while (tie_end < kCardCount &&
-                   ranks->hand_rank[static_cast<std::size_t>(ranks->cards_by_rank[tie_end])] == current) {
-                tie_reach += opponent_reach[static_cast<std::size_t>(ranks->cards_by_rank[tie_end])];
-                ++tie_end;
-            }
-            for (std::size_t i = position; i < tie_end; ++i) {
-                int card = ranks->cards_by_rank[i];
-                double stronger_reach = total_reach - weaker_reach - tie_reach;
-                value[static_cast<std::size_t>(card)] = stake * (weaker_reach - stronger_reach);
-            }
-            weaker_reach += tie_reach;
-            position = tie_end;
-        }
-
         clear_board_cards(state, value);
         return value;
     }
 
+    // Payoff per hole card after a fold: the same chips against every
+    // opponent card, weighted by the board deals that never happen.
+    RihCardVector fold_value(const State& state, Player folder,
+                             const std::array<int, 2>& contributions,
+                             const RihCardVector& opponent_reach) const {
+        double board_multiplicity = undealt_board_multiplicity(state);
+        int pot = contributions[0] + contributions[1];
+        double payoff =
+            responder_ == 1 - folder
+                ? static_cast<double>(pot - contributions[1 - folder])
+                : -static_cast<double>(contributions[responder_]);
+        double total_reach =
+            std::accumulate(opponent_reach.begin(), opponent_reach.end(), 0.0);
+
+        RihCardVector value{};
+        for (int card = 0; card < kCardCount; ++card) {
+            std::size_t card_index = static_cast<std::size_t>(card);
+            value[card_index] = board_multiplicity * payoff *
+                                (total_reach - opponent_reach[card_index]);
+        }
+        return value;
+    }
+
+    // Payoff per hole card at a showdown. Tie groups are swept
+    // weakest first: a card wins the stake from all weaker reach and
+    // loses it to all stronger reach.
+    RihCardVector showdown_value(double stake,
+                                 const RihCardVector& opponent_reach,
+                                 const BoardRanks& ranks) const {
+        double total_reach =
+            std::accumulate(opponent_reach.begin(), opponent_reach.end(), 0.0);
+        double weaker_reach = 0.0;
+        std::size_t position = 0;
+        RihCardVector value{};
+
+        while (position < kCardCount) {
+            std::size_t tie_end = position;
+            eval::HandRank tied_rank = rank_at(ranks, position);
+            double tie_reach = 0.0;
+            while (tie_end < kCardCount &&
+                   rank_at(ranks, tie_end) == tied_rank) {
+                tie_reach += opponent_reach[static_cast<std::size_t>(
+                    ranks.cards_by_rank[tie_end])];
+                ++tie_end;
+            }
+            double stronger_reach = total_reach - weaker_reach - tie_reach;
+            for (std::size_t i = position; i < tie_end; ++i) {
+                std::size_t card_index =
+                    static_cast<std::size_t>(ranks.cards_by_rank[i]);
+                value[card_index] = stake * (weaker_reach - stronger_reach);
+            }
+            weaker_reach += tie_reach;
+            position = tie_end;
+        }
+        return value;
+    }
+
+    // Hand rank of the card at a position of the weakest-first order.
+    static eval::HandRank rank_at(const BoardRanks& ranks,
+                                  std::size_t position) {
+        return ranks
+            .hand_rank[static_cast<std::size_t>(ranks.cards_by_rank[position])];
+    }
+
     // Sums child values over every possible next board card; that
     // card leaves both players' ranges.
-    RihCardVector deal_board_card(const State& state, const RihCardVector& opponent_reach) {
+    RihCardVector deal_board_card(const State& state,
+                                  const RihCardVector& opponent_reach) {
         RihCardVector value{};
-        bool completes_board = state.public_count == 1;
+        bool completes_board = state.board_count == 1;
 
         for (int board_card = 0; board_card < kCardCount; ++board_card) {
-            bool already_public = false;
-            for (std::uint8_t index = 0; index < state.public_count; ++index) {
-                if (state.public_cards[index] == board_card) already_public = true;
+            bool already_on_board = false;
+            for (std::uint8_t index = 0; index < state.board_count; ++index) {
+                if (state.board_cards[index] == board_card)
+                    already_on_board = true;
             }
-            if (already_public) continue;
+            if (already_on_board) continue;
 
-            State child = game_.apply_action(state, kChanceCardOffset + board_card);
+            State child =
+                game_.apply_action(state, kChanceCardOffset + board_card);
             RihCardVector child_reach = opponent_reach;
             child_reach[static_cast<std::size_t>(board_card)] = 0.0;
 
             BoardRanks completed_ranks;
             const BoardRanks* ranks = nullptr;
             if (completes_board) {
-                completed_ranks = rank_every_hole_card(state.public_cards[0], board_card);
+                completed_ranks =
+                    rank_every_hole_card(state.board_cards[0], board_card);
                 ranks = &completed_ranks;
             }
 
             RihCardVector child_value = walk(child, child_reach, ranks);
             for (int card = 0; card < kCardCount; ++card) {
                 if (card == board_card) continue;
-                value[static_cast<std::size_t>(card)] += child_value[static_cast<std::size_t>(card)];
+                value[static_cast<std::size_t>(card)] +=
+                    child_value[static_cast<std::size_t>(card)];
             }
         }
         return value;
@@ -162,48 +224,70 @@ private:
 
     // Per hole card, takes the best action where deviation is
     // allowed and the profile's own mix elsewhere.
-    RihCardVector responder_node(const State& state, const RihCardVector& opponent_reach, const BoardRanks* ranks) {
+    RihCardVector responder_node(const State& state,
+                                 const RihCardVector& opponent_reach,
+                                 const BoardRanks* ranks) {
         std::vector<Action> actions = game_.legal_actions(state);
         RihCardVector value{};
 
         ParsedRounds parsed = parse_rounds(state);
-        bool maximize_here = maximize_ && (deviation_round_ < 0 || parsed.board_cards_dealt == deviation_round_);
+        bool maximize_here =
+            maximize_ && (deviation_round_ == kDeviateInEveryRound ||
+                          parsed.board_cards_dealt == deviation_round_);
 
         std::vector<double> probabilities_by_card;
-        if (!maximize_here) opponent_strategy_(state, responder_, probabilities_by_card);
+        if (!maximize_here)
+            opponent_strategy_(state, responder_, probabilities_by_card);
 
-        for (std::size_t action_index = 0; action_index < actions.size(); ++action_index) {
+        for (std::size_t action_index = 0; action_index < actions.size();
+             ++action_index) {
             RihCardVector child_value =
-                walk(game_.apply_action(state, actions[action_index]), opponent_reach, ranks);
+                walk(game_.apply_action(state, actions[action_index]),
+                     opponent_reach, ranks);
             for (int card = 0; card < kCardCount; ++card) {
-                std::size_t slot = static_cast<std::size_t>(card);
+                std::size_t card_index = static_cast<std::size_t>(card);
                 if (maximize_here) {
-                    value[slot] = action_index == 0 ? child_value[slot] : std::max(value[slot], child_value[slot]);
+                    value[card_index] = action_index == 0
+                                            ? child_value[card_index]
+                                            : std::max(value[card_index],
+                                                       child_value[card_index]);
                 } else {
-                    value[slot] += probabilities_by_card[slot * actions.size() + action_index] * child_value[slot];
+                    value[card_index] +=
+                        probabilities_by_card[card_index * actions.size() +
+                                              action_index] *
+                        child_value[card_index];
                 }
             }
         }
         return value;
     }
 
-    // Splits the opponent's reach by its strategy and sums the
-    // children.
-    RihCardVector opponent_node(const State& state, const RihCardVector& opponent_reach, const BoardRanks* ranks) {
+    // Splits the opponent's reach by its
+    // strategy and sums the children.
+    RihCardVector opponent_node(const State& state,
+                                const RihCardVector& opponent_reach,
+                                const BoardRanks* ranks) {
         std::vector<Action> actions = game_.legal_actions(state);
         std::vector<double> probabilities_by_card;
         opponent_strategy_(state, opponent_, probabilities_by_card);
 
         RihCardVector value{};
-        for (std::size_t action_index = 0; action_index < actions.size(); ++action_index) {
+        for (std::size_t action_index = 0; action_index < actions.size();
+             ++action_index) {
             RihCardVector child_reach{};
             for (int card = 0; card < kCardCount; ++card) {
-                std::size_t slot = static_cast<std::size_t>(card);
-                child_reach[slot] = opponent_reach[slot] * probabilities_by_card[slot * actions.size() + action_index];
+                std::size_t card_index = static_cast<std::size_t>(card);
+                child_reach[card_index] =
+                    opponent_reach[card_index] *
+                    probabilities_by_card[card_index * actions.size() +
+                                          action_index];
             }
-            RihCardVector child_value = walk(game_.apply_action(state, actions[action_index]), child_reach, ranks);
+            RihCardVector child_value =
+                walk(game_.apply_action(state, actions[action_index]),
+                     child_reach, ranks);
             for (int card = 0; card < kCardCount; ++card) {
-                value[static_cast<std::size_t>(card)] += child_value[static_cast<std::size_t>(card)];
+                value[static_cast<std::size_t>(card)] +=
+                    child_value[static_cast<std::size_t>(card)];
             }
         }
         return value;
@@ -219,7 +303,9 @@ private:
 
 // Average value per hand. The two dealt hole cards only move the
 // game past its chance nodes; the walk covers every holding.
-double walk_root(const RihStrategyQuery& strategy, Player responder, bool maximize, int deviation_round = -1) {
+double walk_root(const RihStrategyQuery& strategy, Player responder,
+                 ResponderPolicy policy,
+                 int deviation_round = kDeviateInEveryRound) {
     RhodeIslandGame game;
     State root = game.initial_state();
     root = game.apply_action(root, kChanceCardOffset + 0);
@@ -228,30 +314,33 @@ double walk_root(const RihStrategyQuery& strategy, Player responder, bool maximi
     RihCardVector opponent_reach;
     opponent_reach.fill(1.0);
 
-    BestResponseWalk walker(strategy, responder, maximize, deviation_round);
+    BestResponseWalk walker(strategy, responder, policy, deviation_round);
     RihCardVector value = walker.walk(root, opponent_reach, nullptr);
     return std::accumulate(value.begin(), value.end(), 0.0) / kOrderedDealCount;
 }
 
 }
 
-// Expected chips per hand the responder wins with a best
-// response to opponent_strategy.
-double rih_best_response_value(const RihStrategyQuery& opponent_strategy, game::Player responder) {
-    return walk_root(opponent_strategy, responder, true);
+// Walks with the responder maximizing in each round.
+double rih_best_response_value(const RihStrategyQuery& opponent_strategy,
+                               game::Player responder) {
+    return walk_root(opponent_strategy, responder,
+                     ResponderPolicy::kBestResponse);
 }
 
-// Expected chips per hand for player when both sides follow
-// profile.
-double rih_strategy_value(const RihStrategyQuery& profile, game::Player player) {
-    return walk_root(profile, player, false);
+// Walks with the responder following the profile, so nothing
+// is maximized.
+double rih_strategy_value(const RihStrategyQuery& profile,
+                          game::Player player) {
+    return walk_root(profile, player, ResponderPolicy::kFollowStrategy);
 }
 
-// As rih_best_response_value, but the responder may deviate
-// only in the round with this many board cards dealt.
-double rih_best_response_value_in_round(const RihStrategyQuery& opponent_strategy, game::Player responder,
-                                         int round) {
-    return walk_root(opponent_strategy, responder, true, round);
+// Walks with the responder maximizing in the given round only.
+double rih_best_response_value_in_round(
+    const RihStrategyQuery& opponent_strategy, game::Player responder,
+    int round) {
+    return walk_root(opponent_strategy, responder,
+                     ResponderPolicy::kBestResponse, round);
 }
 
 }

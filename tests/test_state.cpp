@@ -1,3 +1,6 @@
+// State stays trivially copyable, so the per-node copies the solvers
+// make stay plain memory copies.
+
 #include <catch2/catch_test_macros.hpp>
 #include <type_traits>
 

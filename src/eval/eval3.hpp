@@ -1,3 +1,6 @@
+// Three-card hand evaluator. Rhode Island showdowns are its only
+// caller in src.
+
 #pragma once
 
 #include <cstdint>

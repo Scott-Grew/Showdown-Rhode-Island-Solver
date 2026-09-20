@@ -1,3 +1,7 @@
+// Card ids for the 52-card deck, shared by the hand evaluator, Rhode
+// Island hold'em and the published-strategy reader. Lowest layer: it
+// includes nothing else from this project.
+
 #pragma once
 
 #include <cstdint>

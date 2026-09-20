@@ -1,3 +1,6 @@
+// Kuhn rules: zero-sum payoffs, infoset count, hidden opponent card
+// and legal actions.
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
@@ -12,17 +15,18 @@
 
 using namespace cfr::game;
 
-TEST_CASE("V1: kuhn zero-sum at every terminal") {
+TEST_CASE("kuhn zero-sum at every terminal") {
     KuhnGame game;
     walk(game, game.initial_state(), [&](const State& s) {
         if (!game.is_terminal(s)) return;
-        REQUIRE(game.terminal_utility(s, 0) + game.terminal_utility(s, 1) == 0.0);
+        REQUIRE(game.terminal_utility(s, 0) + game.terminal_utility(s, 1) ==
+                0.0);
     });
 }
 
-TEST_CASE("V8: kuhn exactly 12 infosets") {
+TEST_CASE("kuhn exactly 12 infosets") {
     KuhnGame game;
-    std::set<InfoSetKey> keys;
+    std::set<InfosetLabel> keys;
     walk(game, game.initial_state(), [&](const State& s) {
         if (!game.is_terminal(s) && !game.is_chance(s))
             keys.insert(game.infoset_label(s));
@@ -30,18 +34,20 @@ TEST_CASE("V8: kuhn exactly 12 infosets") {
     REQUIRE(keys.size() == 12);
 }
 
-TEST_CASE("V2: kuhn infoset key hides opponent card") {
-
+TEST_CASE("kuhn infoset label hides opponent card") {
     KuhnGame game;
-    std::map<std::tuple<int, int, std::vector<int>>, std::set<InfoSetKey>> keys_by_group;
+    std::map<std::tuple<int, int, std::vector<int>>, std::set<InfosetLabel>>
+        keys_by_group;
 
     walk(game, game.initial_state(), [&](const State& s) {
         if (game.is_terminal(s) || game.is_chance(s)) return;
         int player = game.current_player(s);
-        int own_card = s.private_cards[player];
+        int own_card = s.hole_cards[player];
         std::vector<int> betting;
-        for (std::uint8_t index = 2; index < s.history_len; ++index) betting.push_back(s.history[index]);
-        keys_by_group[{player, own_card, betting}].insert(game.infoset_label(s));
+        for (std::uint8_t index = 2; index < s.history_len; ++index)
+            betting.push_back(s.history[index]);
+        keys_by_group[{player, own_card, betting}].insert(
+            game.infoset_label(s));
     });
 
     for (auto& [group, keys] : keys_by_group) {
@@ -49,7 +55,8 @@ TEST_CASE("V2: kuhn infoset key hides opponent card") {
     }
 }
 
-TEST_CASE("V3: kuhn legal_actions non-empty at every non-terminal, non-chance state") {
+TEST_CASE(
+    "kuhn legal_actions non-empty at every non-terminal, non-chance state") {
     KuhnGame game;
     walk(game, game.initial_state(), [&](const State& s) {
         if (game.is_terminal(s) || game.is_chance(s)) return;
@@ -57,7 +64,7 @@ TEST_CASE("V3: kuhn legal_actions non-empty at every non-terminal, non-chance st
     });
 }
 
-TEST_CASE("V6: kuhn chance outcome probabilities sum to 1") {
+TEST_CASE("kuhn chance outcome probabilities sum to 1") {
     KuhnGame game;
     walk(game, game.initial_state(), [&](const State& s) {
         if (!game.is_chance(s)) return;
@@ -69,13 +76,13 @@ TEST_CASE("V6: kuhn chance outcome probabilities sum to 1") {
     });
 }
 
-TEST_CASE("V21: kuhn infoset index is a bijection onto 0 up to infoset_count") {
+TEST_CASE("kuhn infoset index is a bijection onto 0 up to infoset_count") {
     KuhnGame game;
-    std::map<InfoSetKey, std::uint32_t> index_by_label;
+    std::map<InfosetLabel, std::uint32_t> index_by_label;
     std::set<std::uint32_t> distinct_indices;
     walk(game, game.initial_state(), [&](const State& s) {
         if (game.is_terminal(s) || game.is_chance(s)) return;
-        InfoSetKey label = game.infoset_label(s);
+        InfosetLabel label = game.infoset_label(s);
         std::uint32_t index = game.infoset_index(s);
         REQUIRE(index < game.infoset_count());
         auto existing = index_by_label.emplace(label, index).first;

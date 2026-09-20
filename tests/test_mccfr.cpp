@@ -1,3 +1,6 @@
+// The sampled solver: agreement with analytic Kuhn and with full-tree
+// CFR on Leduc, and the multi-thread invariants.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
@@ -11,8 +14,8 @@
 #include "solver/mccfr_solver.hpp"
 
 using namespace cfr::game;
-using cfr::solver::ExternalSamplingSolver;
 using cfr::solver::exploitability;
+using cfr::solver::ExternalSamplingSolver;
 
 TEST_CASE("external sampling reaches the analytic kuhn game value") {
     KuhnGame game;
@@ -30,7 +33,7 @@ TEST_CASE("external sampling and vanilla cfr agree on leduc") {
     REQUIRE(exploitability(game, solver.average_strategy()) < 0.1);
 }
 
-TEST_CASE("V27: strategy mass equals opponent node visits at every thread count") {
+TEST_CASE("strategy mass equals opponent node visits at every thread count") {
     for (int thread_count : {1, 2, 4}) {
         LeducGame game;
         ExternalSamplingSolver<LeducGame> solver(game, 20260726);
@@ -43,7 +46,7 @@ TEST_CASE("V27: strategy mass equals opponent node visits at every thread count"
     }
 }
 
-TEST_CASE("V28: one thread is byte-identical to the serial reference") {
+TEST_CASE("one thread is byte-identical to the serial reference") {
     LeducGame game;
     ExternalSamplingSolver<LeducGame> single(game, 20260726);
     ExternalSamplingSolver<LeducGame> repeat(game, 20260726);
@@ -59,7 +62,7 @@ TEST_CASE("V28: one thread is byte-identical to the serial reference") {
     }
 }
 
-TEST_CASE("V29: per-thread streams are distinct") {
+TEST_CASE("per-thread streams are distinct") {
     REQUIRE(cfr::solver::scrambled_seed(20260726, 0) == 20260726);
     std::set<std::uint64_t> seen;
     for (std::size_t index = 0; index < 16; ++index) {

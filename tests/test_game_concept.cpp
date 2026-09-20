@@ -1,3 +1,5 @@
+// Compile-time check that the game classes satisfy GameLike.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "game/game.hpp"

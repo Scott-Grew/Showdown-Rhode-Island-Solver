@@ -1,3 +1,6 @@
+// The strategy container and the regret-matching arithmetic that both
+// solvers share.
+
 #pragma once
 
 #include <algorithm>
@@ -11,14 +14,15 @@
 namespace cfr::solver {
 
 // Action probabilities per infoset label, in legal_actions order.
-using StrategyProfile = std::map<game::InfoSetKey, std::vector<double>>;
+using StrategyProfile = std::map<game::InfosetLabel, std::vector<double>>;
 
 // Totals at or below this count as empty and become uniform.
 inline constexpr double kStrategySumEpsilon = 1e-12;
 
 // Scales values to sum to 1 in place, or sets them uniform when
 // the total is not above epsilon.
-inline void normalize_or_uniform(std::span<double> values, double epsilon = kStrategySumEpsilon) {
+inline void normalize_or_uniform(std::span<double> values,
+                                 double epsilon = kStrategySumEpsilon) {
     double total = 0.0;
     for (double value : values) total += value;
 
@@ -31,7 +35,8 @@ inline void normalize_or_uniform(std::span<double> values, double epsilon = kStr
 }
 
 // Average strategy of one infoset from its accumulated sums.
-inline std::vector<double> average_from_sums(std::span<const double> strategy_sum) {
+inline std::vector<double> average_from_sums(
+    std::span<const double> strategy_sum) {
     std::vector<double> strategy(strategy_sum.begin(), strategy_sum.end());
     normalize_or_uniform(strategy);
     return strategy;
@@ -44,24 +49,29 @@ inline void regret_matching_in_place(std::span<double> strategy) {
     normalize_or_uniform(strategy, 0.0);
 }
 
-// Regret matching written into strategy; both spans must have the
-// same length.
-inline void regret_matching_strategy_into(std::span<const double> cumulative_regrets, std::span<double> strategy) {
-    for (std::size_t i = 0; i < cumulative_regrets.size(); ++i) strategy[i] = cumulative_regrets[i];
+// Regret matching written into strategy;
+// both spans must have the same length.
+inline void regret_matching_strategy_into(
+    std::span<const double> cumulative_regrets, std::span<double> strategy) {
+    for (std::size_t i = 0; i < cumulative_regrets.size(); ++i)
+        strategy[i] = cumulative_regrets[i];
     regret_matching_in_place(strategy);
 }
 
 // Regret matching returned as its own vector.
-inline std::vector<double> regret_matching_strategy(std::span<const double> cumulative_regrets) {
+inline std::vector<double> regret_matching_strategy(
+    std::span<const double> cumulative_regrets) {
     std::vector<double> strategy(cumulative_regrets.size());
     regret_matching_strategy_into(cumulative_regrets, strategy);
     return strategy;
 }
 
 // CFR+ update: adds the increments and floors each regret at zero.
-inline void accumulate_regret_plus(std::span<double> cumulative_regrets, std::span<const double> increments) {
+inline void accumulate_regret_plus(std::span<double> cumulative_regrets,
+                                   std::span<const double> increments) {
     for (std::size_t i = 0; i < cumulative_regrets.size(); ++i) {
-        cumulative_regrets[i] = std::max(cumulative_regrets[i] + increments[i], 0.0);
+        cumulative_regrets[i] =
+            std::max(cumulative_regrets[i] + increments[i], 0.0);
     }
 }
 

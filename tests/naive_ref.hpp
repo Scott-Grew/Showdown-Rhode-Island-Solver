@@ -1,3 +1,6 @@
+// A second, independently written three-card evaluator that
+// test_eval3.cpp compares eval3 against.
+
 #pragma once
 
 #include <array>
