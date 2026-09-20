@@ -395,7 +395,9 @@ State permute_suits(const State& state,
                 static_cast<std::int8_t>(remap(state.hole_cards[i]));
         }
     }
-    for (std::uint8_t i = 0; i < state.board_count; ++i) {
+    std::size_t board_count =
+        std::min<std::size_t>(state.board_count, kMaxBoardCards);
+    for (std::size_t i = 0; i < board_count; ++i) {
         permuted.board_cards[i] =
             static_cast<std::int8_t>(remap(state.board_cards[i]));
     }
