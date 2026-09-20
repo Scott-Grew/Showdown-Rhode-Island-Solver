@@ -1,3 +1,5 @@
+// Card id encoding: rank and suit round-trip for all 52 cards.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "game/card.hpp"
@@ -34,7 +36,6 @@ TEST_CASE("card: every encoding 0..51 is reachable and unique") {
 }
 
 TEST_CASE("card: directed rank/suit extraction") {
-
     REQUIRE(card_rank(0) == 0);
     REQUIRE(card_suit(0) == 0);
 

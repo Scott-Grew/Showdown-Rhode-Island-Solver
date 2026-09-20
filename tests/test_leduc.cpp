@@ -1,3 +1,6 @@
+// Leduc rules: zero-sum payoffs, infoset indexing, hidden opponent
+// card and exact pot accounting.
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
@@ -13,18 +16,18 @@
 
 using namespace cfr::game;
 
-TEST_CASE("V1: leduc zero-sum at every terminal") {
+TEST_CASE("leduc zero-sum at every terminal") {
     LeducGame game;
     walk(game, game.initial_state(), [&](const State& s) {
         if (!game.is_terminal(s)) return;
-        REQUIRE(game.terminal_utility(s, 0) + game.terminal_utility(s, 1) == 0.0);
+        REQUIRE(game.terminal_utility(s, 0) + game.terminal_utility(s, 1) ==
+                0.0);
     });
 }
 
-TEST_CASE("V8: leduc infoset count is measured and stable") {
-
+TEST_CASE("leduc infoset count is measured and stable") {
     LeducGame game;
-    std::set<InfoSetKey> keys;
+    std::set<InfosetLabel> keys;
     walk(game, game.initial_state(), [&](const State& s) {
         if (!game.is_terminal(s) && !game.is_chance(s))
             keys.insert(game.infoset_label(s));
@@ -32,17 +35,18 @@ TEST_CASE("V8: leduc infoset count is measured and stable") {
     CHECK(keys.size() == 288);
 }
 
-TEST_CASE("V2: leduc infoset key hides opponent card") {
-
+TEST_CASE("leduc infoset label hides opponent card") {
     LeducGame game;
-    std::map<std::tuple<int, int, int, std::vector<Action>, std::vector<Action>>, std::set<InfoSetKey>>
+    std::map<
+        std::tuple<int, int, int, std::vector<Action>, std::vector<Action>>,
+        std::set<InfosetLabel>>
         keys_by_group;
 
     walk(game, game.initial_state(), [&](const State& s) {
         if (game.is_terminal(s) || game.is_chance(s)) return;
         int player = game.current_player(s);
-        int own_card = s.private_cards[player];
-        int public_card = s.public_count == 0 ? -1 : s.public_cards[0];
+        int own_card = s.hole_cards[player];
+        int board_card = s.board_count == 0 ? -1 : s.board_cards[0];
 
         std::vector<Action> round1_betting_actions;
         std::vector<Action> round2_betting_actions;
@@ -59,7 +63,8 @@ TEST_CASE("V2: leduc infoset key hides opponent card") {
                 round2_betting_actions.push_back(entry);
             }
         }
-        keys_by_group[{player, own_card, public_card, round1_betting_actions, round2_betting_actions}]
+        keys_by_group[{player, own_card, board_card, round1_betting_actions,
+                       round2_betting_actions}]
             .insert(game.infoset_label(s));
     });
 
@@ -68,7 +73,8 @@ TEST_CASE("V2: leduc infoset key hides opponent card") {
     }
 }
 
-TEST_CASE("V3: leduc legal_actions non-empty at every non-terminal, non-chance state") {
+TEST_CASE(
+    "leduc legal_actions non-empty at every non-terminal, non-chance state") {
     LeducGame game;
     walk(game, game.initial_state(), [&](const State& s) {
         if (game.is_terminal(s) || game.is_chance(s)) return;
@@ -76,7 +82,7 @@ TEST_CASE("V3: leduc legal_actions non-empty at every non-terminal, non-chance s
     });
 }
 
-TEST_CASE("V6: leduc chance outcome probabilities sum to 1") {
+TEST_CASE("leduc chance outcome probabilities sum to 1") {
     LeducGame game;
     walk(game, game.initial_state(), [&](const State& s) {
         if (!game.is_chance(s)) return;
@@ -88,13 +94,13 @@ TEST_CASE("V6: leduc chance outcome probabilities sum to 1") {
     });
 }
 
-TEST_CASE("V21: leduc infoset index is a bijection onto 0 up to infoset_count") {
+TEST_CASE("leduc infoset index is a bijection onto 0 up to infoset_count") {
     LeducGame game;
-    std::map<InfoSetKey, std::uint32_t> index_by_label;
+    std::map<InfosetLabel, std::uint32_t> index_by_label;
     std::set<std::uint32_t> distinct_indices;
     walk(game, game.initial_state(), [&](const State& s) {
         if (game.is_terminal(s) || game.is_chance(s)) return;
-        InfoSetKey label = game.infoset_label(s);
+        InfosetLabel label = game.infoset_label(s);
         std::uint32_t index = game.infoset_index(s);
         REQUIRE(index < game.infoset_count());
         auto existing = index_by_label.emplace(label, index).first;
@@ -118,7 +124,8 @@ TEST_CASE("leduc: raise cap enforced at 2 per round") {
     std::vector<Action> legal = game.legal_actions(state);
     REQUIRE(std::find(legal.begin(), legal.end(), kActionRaise) == legal.end());
     REQUIRE(std::find(legal.begin(), legal.end(), kActionFold) != legal.end());
-    REQUIRE(std::find(legal.begin(), legal.end(), kActionCallCheck) != legal.end());
+    REQUIRE(std::find(legal.begin(), legal.end(), kActionCallCheck) !=
+            legal.end());
 }
 
 TEST_CASE("leduc: split pot pays 0 to both players") {
@@ -157,11 +164,11 @@ TEST_CASE("leduc: round 2 bet doubles round 1's size") {
     REQUIRE(game.terminal_utility(state, 1) == -5.0);
 }
 
-TEST_CASE("V26: leduc re-raise line pot is exact at every step") {
+TEST_CASE("leduc re-raise line pot is exact at every step") {
     LeducGame game;
     auto pot_of = [](const State& state) {
-        std::array<int, 2> contribution = leduc_contributions(state);
-        return contribution[0] + contribution[1];
+        std::array<int, 2> contributions = leduc_contributions(state);
+        return contributions[0] + contributions[1];
     };
     State state = game.initial_state();
     state = game.apply_action(state, kChanceCardOffset + 0);
@@ -175,20 +182,22 @@ TEST_CASE("V26: leduc re-raise line pot is exact at every step") {
     REQUIRE(pot_of(state) == 10);
 }
 
-TEST_CASE("V26: leduc showdown pays exactly half the pot — a closed round leaves equal money in") {
+TEST_CASE(
+    "leduc showdown pays half the pot: a closed round leaves equal money in") {
     LeducGame game;
     long long showdown_terminals = 0;
     walk(game, game.initial_state(), [&](const State& state) {
         if (!game.is_terminal(state)) return;
         if (state.history[state.history_len - 1] == kActionFold) return;
         ++showdown_terminals;
-        std::array<int, 2> contribution = leduc_contributions(state);
-        REQUIRE(contribution[0] == contribution[1]);
-        int pot = contribution[0] + contribution[1];
+        std::array<int, 2> contributions = leduc_contributions(state);
+        REQUIRE(contributions[0] == contributions[1]);
+        int pot = contributions[0] + contributions[1];
         REQUIRE(pot % 2 == 0);
         double first_player_utility = game.terminal_utility(state, 0);
         double half_pot = pot / 2.0;
-        REQUIRE((first_player_utility == 0.0 || first_player_utility == half_pot ||
+        REQUIRE((first_player_utility == 0.0 ||
+                 first_player_utility == half_pot ||
                  first_player_utility == -half_pot));
     });
     REQUIRE(showdown_terminals > 0);

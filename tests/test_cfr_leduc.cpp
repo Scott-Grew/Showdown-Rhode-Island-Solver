@@ -1,3 +1,6 @@
+// Runs both full-tree solvers on Leduc briefly, so sanitizer builds
+// cover those code paths.
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "game/leduc.hpp"
@@ -7,7 +10,8 @@
 using namespace cfr::game;
 using namespace cfr::solver;
 
-TEST_CASE("V25: leduc solvers exercise every path at sanitizer-affordable iteration counts") {
+TEST_CASE(
+    "leduc solvers run every path at sanitizer-affordable iteration counts") {
     LeducGame game;
 
     VanillaCfr<cfr::game::LeducGame> vanilla_solver(game);

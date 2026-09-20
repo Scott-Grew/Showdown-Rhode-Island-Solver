@@ -1,3 +1,6 @@
+// The reference three-card evaluator: sorts and compares ranks the
+// slow, obvious way.
+
 #include "naive_ref.hpp"
 
 #include <algorithm>
@@ -31,18 +34,23 @@ NaiveRank naive_evaluate_3card(const Card* cards) {
 
     std::array<int, 3> sorted_ranks = ranks;
     std::sort(sorted_ranks.begin(), sorted_ranks.end());
-    bool all_distinct = sorted_ranks[0] != sorted_ranks[1] && sorted_ranks[1] != sorted_ranks[2];
+    bool all_distinct = sorted_ranks[0] != sorted_ranks[1] &&
+                        sorted_ranks[1] != sorted_ranks[2];
     bool is_wheel = sorted_ranks == kWheelRanksAscending3;
-    bool is_straight = all_distinct && (is_wheel || sorted_ranks[2] - sorted_ranks[0] == 2);
+    bool is_straight =
+        all_distinct && (is_wheel || sorted_ranks[2] - sorted_ranks[0] == 2);
     int straight_high = is_wheel ? sorted_ranks[1] : sorted_ranks[2];
 
     std::vector<std::pair<int, int>> count_rank_pairs;
     for (int rank = 0; rank < kRankCount; ++rank) {
-        if (rank_counts[rank] > 0) count_rank_pairs.emplace_back(rank_counts[rank], rank);
+        if (rank_counts[rank] > 0)
+            count_rank_pairs.emplace_back(rank_counts[rank], rank);
     }
-    std::sort(count_rank_pairs.begin(), count_rank_pairs.end(), [](const auto& a, const auto& b) {
-        return a.first != b.first ? a.first > b.first : a.second > b.second;
-    });
+    std::sort(count_rank_pairs.begin(), count_rank_pairs.end(),
+              [](const auto& a, const auto& b) {
+                  return a.first != b.first ? a.first > b.first
+                                            : a.second > b.second;
+              });
 
     NaiveRank result;
     for (std::size_t i = 0; i < count_rank_pairs.size(); ++i) {

@@ -1,3 +1,5 @@
+// Test helper: visits each state of a game tree, depth first.
+
 #pragma once
 
 #include "game/game.hpp"

@@ -1,3 +1,6 @@
+// Full-tree CFR on Kuhn against the analytic equilibrium: game value
+// -1/18, low exploitability and the known strategy structure.
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 
@@ -16,13 +19,16 @@ using namespace cfr::solver;
 namespace {
 
 template <typename GameT>
-double expected_value(const GameT& game, const StrategyProfile& profile, Player player, const State& state) {
+double expected_value(const GameT& game, const StrategyProfile& profile,
+                      Player player, const State& state) {
     if (game.is_terminal(state)) return game.terminal_utility(state, player);
 
     if (game.is_chance(state)) {
         double value = 0.0;
         for (auto& [action, probability] : game.chance_outcomes(state))
-            value += probability * expected_value(game, profile, player, game.apply_action(state, action));
+            value +=
+                probability * expected_value(game, profile, player,
+                                             game.apply_action(state, action));
         return value;
     }
 
@@ -32,34 +38,40 @@ double expected_value(const GameT& game, const StrategyProfile& profile, Player 
 
     double value = 0.0;
     for (std::size_t i = 0; i < actions.size(); ++i) {
-        double action_probability = profile_entry != profile.end() ? profile_entry->second[i] : uniform_probability;
-        value += action_probability * expected_value(game, profile, player, game.apply_action(state, actions[i]));
+        double action_probability = profile_entry != profile.end()
+                                        ? profile_entry->second[i]
+                                        : uniform_probability;
+        value += action_probability *
+                 expected_value(game, profile, player,
+                                game.apply_action(state, actions[i]));
     }
     return value;
 }
 
 template <typename GameT>
-double expected_value(const GameT& game, const StrategyProfile& profile, Player player) {
+double expected_value(const GameT& game, const StrategyProfile& profile,
+                      Player player) {
     return expected_value(game, profile, player, game.initial_state());
 }
 
 }
 
-TEST_CASE("V11: kuhn exploitability < 1e-3 after 1e5 iterations") {
+TEST_CASE("kuhn exploitability < 1e-3 after 1e5 iterations") {
     KuhnGame game;
     VanillaCfr<cfr::game::KuhnGame> solver(game);
     solver.run_iterations(100000);
     REQUIRE(exploitability(game, solver.average_strategy()) < 1e-3);
 }
 
-TEST_CASE("V12: kuhn game value converges to -1/18") {
+TEST_CASE("kuhn game value converges to -1/18") {
     KuhnGame game;
     VanillaCfr<cfr::game::KuhnGame> solver(game);
     solver.run_iterations(100000);
-    CHECK(expected_value(game, solver.average_strategy(), 0) == Catch::Approx(-1.0 / 18.0).margin(1e-3));
+    CHECK(expected_value(game, solver.average_strategy(), 0) ==
+          Catch::Approx(-1.0 / 18.0).margin(1e-3));
 }
 
-TEST_CASE("V14: kuhn deterministic — two runs identical") {
+TEST_CASE("kuhn deterministic — two runs identical") {
     KuhnGame game;
 
     VanillaCfr<cfr::game::KuhnGame> solver_a(game);
@@ -71,7 +83,7 @@ TEST_CASE("V14: kuhn deterministic — two runs identical") {
     REQUIRE(solver_a.average_strategy() == solver_b.average_strategy());
 }
 
-TEST_CASE("V15: kuhn analytic structure of equilibrium") {
+TEST_CASE("kuhn analytic structure of equilibrium") {
     KuhnGame game;
     VanillaCfr<cfr::game::KuhnGame> solver(game);
     solver.run_iterations(100000);
@@ -91,8 +103,7 @@ TEST_CASE("V15: kuhn analytic structure of equilibrium") {
     CHECK(p0_king_bet == Catch::Approx(3.0 * p0_jack_bet).margin(0.05));
 }
 
-TEST_CASE("V11: kuhn exploitability decreases across decade checkpoints") {
-
+TEST_CASE("kuhn exploitability decreases across decade checkpoints") {
     KuhnGame game;
     VanillaCfr<cfr::game::KuhnGame> solver(game);
 
@@ -102,7 +113,8 @@ TEST_CASE("V11: kuhn exploitability decreases across decade checkpoints") {
     for (int checkpoint : checkpoint_iterations) {
         solver.run_iterations(checkpoint - iterations_run);
         iterations_run = checkpoint;
-        double current_exploitability = exploitability(game, solver.average_strategy());
+        double current_exploitability =
+            exploitability(game, solver.average_strategy());
         CHECK(current_exploitability < previous_exploitability);
         previous_exploitability = current_exploitability;
     }

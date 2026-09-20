@@ -1,0 +1,14 @@
+BasedOnStyle: Google
+ColumnLimit: 80
+IndentWidth: 4
+AccessModifierOffset: -4
+SortIncludes: false
+ReflowComments: false
+DerivePointerAlignment: false
+PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+FixNamespaceComments: false
+BreakStringLiterals: false
