@@ -27,8 +27,10 @@ constexpr Player opponent(Player player) {
 
 // Fixed capacities of the State arrays below. A betting round holds
 // at most eight actions, and every game here deals from at most 52
-// cards.
-inline constexpr std::size_t kMaxHistory = 32;
+// cards. History is 30 rather than 32 so the two closing-sequence
+// bytes fit and State stays within 64 bytes. The longest hand is
+// 19 entries.
+inline constexpr std::size_t kMaxHistory = 30;
 inline constexpr std::size_t kMaxBoardCards = 2;
 inline constexpr std::size_t kMaxActionsPerRound = 8;
 inline constexpr std::size_t kMaxChanceOutcomes = 52;
@@ -80,7 +82,9 @@ private:
 // are history's last round_len entries. contribution includes
 // the ante. showdown_rank is filled when Rhode Island deals the
 // turn. round_contribution and level_to_match are the running
-// pot of the active round.
+// pot of the active round. closing[r] is the closing-sequence
+// code of completed round r, written when that round's board
+// card is dealt.
 struct State {
     std::array<std::int8_t, 2> hole_cards{-1, -1};
     std::array<std::int8_t, kMaxBoardCards> board_cards{-1, -1};
@@ -89,6 +93,7 @@ struct State {
     std::uint8_t history_len = 0;
     std::uint8_t round_len = 0;
     std::uint8_t raises_used = 0;
+    std::array<std::uint8_t, 2> closing{};
     std::array<int, 2> contribution{};
     std::array<int, 2> round_contribution{};
     int level_to_match = 0;

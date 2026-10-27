@@ -111,7 +111,8 @@ State LeducGame::apply_action(const State& state, Action action) const {
     bool dealing = is_chance(state);
     append_action(next, action);
     if (dealing) {
-        deal_and_advance(next, action - kChanceCardOffset);
+        deal_and_advance(next, action - kChanceCardOffset,
+                         kLeducMaxRaisesPerRound);
         return next;
     }
     int bet_size = next.board_count == 0 ? kLeducRound1Bet : kLeducRound2Bet;

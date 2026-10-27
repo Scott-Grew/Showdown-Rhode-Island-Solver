@@ -27,6 +27,7 @@ endif()
 
 add_library(cfr_game STATIC
     src/game/rhode_island.cpp
+    src/abstraction/rih_gameshrink.cpp
 )
 target_include_directories(cfr_game PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
@@ -36,7 +37,6 @@ add_library(cfr_eval STATIC
 target_include_directories(cfr_eval PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 add_library(cfr_solver STATIC
-    src/abstraction/rih_gameshrink.cpp
     src/solver/rih_best_response.cpp
 )
 target_include_directories(cfr_solver PUBLIC ${CMAKE_SOURCE_DIR}/src)

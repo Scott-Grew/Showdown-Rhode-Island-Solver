@@ -2,12 +2,16 @@
 // CFR on Leduc, and the multi-thread invariants.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <fstream>
 #include <set>
 #include <vector>
 
+#include "game/rhode_island.hpp"
 #include "oracles/best_response.hpp"
 #include "oracles/kuhn.hpp"
 #include "oracles/leduc.hpp"
@@ -93,4 +97,32 @@ TEST_CASE("per-thread streams are distinct") {
         seen.insert(cfr::solver::scrambled_seed(20260726, index));
     }
     REQUIRE(seen.size() == 16);
+}
+
+TEST_CASE("load_strategy_sums rejects a suit-canonical checkpoint") {
+    RhodeIslandGame game;
+    REQUIRE(game.infoset_count() == 3142152);
+    ExternalSamplingSolver<RhodeIslandGame> solver(game, 1);
+
+    const char* path = "/tmp/cfr-old-rih-checkpoint.bin";
+    struct RemoveFile {
+        const char* path;
+        ~RemoveFile() { std::remove(path); }
+    } cleanup{path};
+
+    {
+        std::ofstream output(path, std::ios::binary);
+        // Previous table: 5,139,368 infosets and 3 actions each.
+        std::uint64_t value_count = 5139368ULL * 3ULL;
+        int iteration = 1;
+        output.write(reinterpret_cast<const char*>(&value_count),
+                     sizeof(value_count));
+        output.write(reinterpret_cast<const char*>(&iteration),
+                     sizeof(iteration));
+        REQUIRE(output.good());
+    }
+
+    REQUIRE_THROWS_WITH(
+        solver.load_strategy_sums(path),
+        Catch::Matchers::ContainsSubstring("strategy table size mismatch"));
 }

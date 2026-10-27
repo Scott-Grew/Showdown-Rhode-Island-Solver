@@ -1,5 +1,6 @@
-// Bottom-up type construction and top-down class construction for
-// Rhode Island Hold'em GameShrink.
+// One labelling pass for Rhode Island Hold'em GameShrink.
+// compute() runs it from a single class and ignores opponent labels.
+// refined() repeats it with those labels until the classes stop splitting.
 
 #include "abstraction/rih_gameshrink.hpp"
 
@@ -10,6 +11,7 @@
 #include <cstdint>
 #include <map>
 #include <span>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -18,10 +20,6 @@
 namespace cfr::abstraction {
 
 namespace {
-
-using Type3 = std::array<std::uint8_t, 3>;
-using Type2 = std::array<Type3, kCardCount - 2>;
-using Type1 = std::array<std::uint16_t, kCardCount - 1>;
 
 constexpr std::size_t pair_index(int hole, int flop) {
     return static_cast<std::size_t>(hole) * kCardCount +
@@ -35,152 +33,187 @@ constexpr std::size_t triple_index(int hole, int flop, int turn) {
            static_cast<std::size_t>(turn);
 }
 
+// find before insert: a round-3 key holds 49 opponent entries, and
+// emplace would copy it on every one of the 132k hands.
 template <typename Key>
-std::uint16_t intern_label(std::map<Key, std::uint16_t>& ids, const Key& key,
-                           std::uint16_t& next_id) {
-    auto [entry, inserted] = ids.emplace(key, next_id);
-    if (inserted) ++next_id;
-    return entry->second;
+std::uint16_t intern(std::map<Key, std::uint16_t>& ids, const Key& key,
+                     std::uint16_t& next_id) {
+    auto found = ids.find(key);
+    if (found != ids.end()) return found->second;
+    ids.emplace(key, next_id);
+    return next_id++;
 }
 
-void compute_type3_labels(std::vector<Type3>& type3_by_triple) {
-    std::array<eval::HandRank, kCardCount> hole_rank{};
-    std::array<int, kCardCount - 2> holes_by_rank{};
-    std::array<Card, 3> hand{};
-
-    for (int flop = 0; flop < kCardCount; ++flop) {
-        hand[1] = static_cast<Card>(flop);
-        for (int turn = 0; turn < kCardCount; ++turn) {
-            if (turn == flop) continue;
-            hand[2] = static_cast<Card>(turn);
-
-            std::size_t hole_count = 0;
-            for (int hole = 0; hole < kCardCount; ++hole) {
-                if (hole == flop || hole == turn) continue;
-                holes_by_rank[hole_count++] = hole;
-                hand[0] = static_cast<Card>(hole);
-                hole_rank[static_cast<std::size_t>(hole)] =
-                    eval::evaluate_3card(hand.data());
-            }
-
-            std::sort(holes_by_rank.begin(), holes_by_rank.end(),
-                      [&hole_rank](int left, int right) {
-                          return hole_rank[static_cast<std::size_t>(left)] <
-                                 hole_rank[static_cast<std::size_t>(right)];
-                      });
-
-            std::size_t begin = 0;
-            while (begin < holes_by_rank.size()) {
-                std::size_t end = begin + 1;
-                eval::HandRank rank =
-                    hole_rank[static_cast<std::size_t>(holes_by_rank[begin])];
-                while (
-                    end < holes_by_rank.size() &&
-                    hole_rank[static_cast<std::size_t>(holes_by_rank[end])] ==
-                        rank) {
-                    ++end;
-                }
-
-                std::uint8_t wins = static_cast<std::uint8_t>(begin);
-                std::uint8_t ties = static_cast<std::uint8_t>(end - begin - 1);
-                std::uint8_t losses =
-                    static_cast<std::uint8_t>(holes_by_rank.size() - end);
-                for (std::size_t i = begin; i < end; ++i) {
-                    int hole = holes_by_rank[i];
-                    type3_by_triple[triple_index(hole, flop, turn)] = {
-                        wins, ties, losses};
-                }
-                begin = end;
-            }
-        }
-    }
-}
-
-}
-
-RihPartition RihPartition::compute() {
-    RihPartition partition;
-    partition.class_by_tuple_.assign(kStorageSize, 0);
-
-    std::vector<Type3> type3_by_triple(static_cast<std::size_t>(kCardCount) *
-                                       kCardCount * kCardCount);
-    std::vector<std::uint16_t> type2_by_pair(
-        static_cast<std::size_t>(kCardCount) * kCardCount, 0);
-
-    compute_type3_labels(type3_by_triple);
-
-    std::map<Type2, std::uint16_t> type2_ids;
-    std::uint16_t next_type2_id = 0;
+template <typename Visit>
+void for_each_turn(Visit&& visit) {
     for (int hole = 0; hole < kCardCount; ++hole) {
         for (int flop = 0; flop < kCardCount; ++flop) {
             if (flop == hole) continue;
-            Type2 type2{};
-            std::size_t turn_index = 0;
             for (int turn = 0; turn < kCardCount; ++turn) {
                 if (turn == hole || turn == flop) continue;
-                type2[turn_index++] =
-                    type3_by_triple[triple_index(hole, flop, turn)];
+                visit(hole, flop, turn);
             }
-            std::sort(type2.begin(), type2.end());
-            type2_by_pair[pair_index(hole, flop)] =
-                intern_label(type2_ids, type2, next_type2_id);
         }
     }
+}
 
-    std::map<Type1, std::uint16_t> class1_ids;
-    std::uint16_t next_class1_id = 0;
-    for (int hole = 0; hole < kCardCount; ++hole) {
-        Type1 type1{};
-        std::size_t flop_index = 0;
-        for (int flop = 0; flop < kCardCount; ++flop) {
-            if (flop == hole) continue;
-            type1[flop_index++] = type2_by_pair[pair_index(hole, flop)];
+constexpr std::size_t kOpponents = static_cast<std::size_t>(kCardCount) - 3;
+constexpr std::size_t kTurns = static_cast<std::size_t>(kCardCount) - 2;
+constexpr std::size_t kFlops = static_cast<std::size_t>(kCardCount) - 1;
+constexpr std::size_t kTriples =
+    static_cast<std::size_t>(kCardCount) * kCardCount * kCardCount;
+constexpr std::size_t kPairs =
+    static_cast<std::size_t>(kCardCount) * kCardCount;
+
+std::vector<std::uint16_t> showdown_ranks() {
+    std::vector<std::uint16_t> rank(kTriples, 0);
+    std::array<Card, 3> hand{};
+    for_each_turn([&](int hole, int flop, int turn) {
+        hand[0] = static_cast<Card>(hole);
+        hand[1] = static_cast<Card>(flop);
+        hand[2] = static_cast<Card>(turn);
+        rank[triple_index(hole, flop, turn)] =
+            eval::evaluate_3card(hand.data());
+    });
+    return rank;
+}
+
+// Current class plus the sorted multiset of child ids.
+template <std::size_t N>
+using Bag = std::pair<std::uint16_t, std::array<std::uint16_t, N>>;
+
+template <std::size_t N, typename Fill>
+std::uint16_t intern_bag(std::map<Bag<N>, std::uint16_t>& ids,
+                         std::uint16_t& next, std::uint16_t current,
+                         Fill&& fill) {
+    Bag<N> key{};
+    key.first = current;
+    fill(key.second);
+    std::sort(key.second.begin(), key.second.end());
+    return intern(ids, key, next);
+}
+
+}
+
+// Round 3's leaf is (current class, opponent class or a constant,
+// showdown outcome). Rounds 2 and 1 take the sorted multiset of those
+// new child ids. The sibling rule then names each class by its parent.
+RihPartition RihPartition::label(std::span<const std::uint16_t> showdown_rank,
+                                 bool opponent_labels) const {
+    using Leaf = std::pair<std::uint16_t, std::uint8_t>;
+    using LeafKey = std::pair<std::uint16_t, std::array<Leaf, kOpponents>>;
+    using ParentKey = std::pair<std::uint16_t, std::uint16_t>;
+
+    std::vector<std::uint16_t> raw3(kTriples, 0);
+    std::vector<std::uint16_t> raw2(kPairs, 0);
+    std::map<LeafKey, std::uint16_t> ids3;
+    std::uint16_t next3 = 0;
+    for_each_turn([&](int hole, int flop, int turn) {
+        std::size_t self = triple_index(hole, flop, turn);
+        LeafKey key;
+        key.first = class_by_tuple_[kRound2Offset + self];
+        std::uint16_t mine = showdown_rank[self];
+        std::size_t count = 0;
+        for (int opponent = 0; opponent < kCardCount; ++opponent) {
+            if (opponent == hole || opponent == flop || opponent == turn)
+                continue;
+            std::size_t opp = triple_index(opponent, flop, turn);
+            std::uint16_t theirs = showdown_rank[opp];
+            std::uint8_t outcome = 1;
+            if (mine > theirs)
+                outcome = 2;
+            else if (mine < theirs)
+                outcome = 0;
+            std::uint16_t opp_class = 0;
+            if (opponent_labels)
+                opp_class = class_by_tuple_[kRound2Offset + opp];
+            key.second[count++] = {opp_class, outcome};
         }
-        std::sort(type1.begin(), type1.end());
-        partition
-            .class_by_tuple_[kRound0Offset + static_cast<std::size_t>(hole)] =
-            intern_label(class1_ids, type1, next_class1_id);
-    }
-    partition.class_counts_[0] = next_class1_id;
+        std::sort(key.second.begin(), key.second.end());
+        raw3[self] = intern(ids3, key, next3);
+    });
 
-    using Class2Key = std::pair<std::uint16_t, std::uint16_t>;
-    std::map<Class2Key, std::uint16_t> class2_ids;
-    std::uint16_t next_class2_id = 0;
+    std::map<Bag<kTurns>, std::uint16_t> ids2;
+    std::uint16_t next2 = 0;
     for (int hole = 0; hole < kCardCount; ++hole) {
-        std::uint16_t parent =
-            partition.class_by_tuple_[kRound0Offset +
-                                      static_cast<std::size_t>(hole)];
         for (int flop = 0; flop < kCardCount; ++flop) {
             if (flop == hole) continue;
             std::size_t index = pair_index(hole, flop);
-            Class2Key key{parent, type2_by_pair[index]};
-            partition.class_by_tuple_[kRound1Offset + index] =
-                intern_label(class2_ids, key, next_class2_id);
+            raw2[index] = intern_bag<kTurns>(
+                ids2, next2, class_by_tuple_[kRound1Offset + index],
+                [&](std::array<std::uint16_t, kTurns>& children) {
+                    std::size_t count = 0;
+                    for (int turn = 0; turn < kCardCount; ++turn) {
+                        if (turn == hole || turn == flop) continue;
+                        children[count++] =
+                            raw3[triple_index(hole, flop, turn)];
+                    }
+                });
         }
     }
-    partition.class_counts_[1] = next_class2_id;
 
-    using Class3Key = std::pair<std::uint16_t, Type3>;
-    std::map<Class3Key, std::uint16_t> class3_ids;
-    std::uint16_t next_class3_id = 0;
+    RihPartition next;
+    next.class_by_tuple_.assign(kStorageSize, 0);
+    std::map<Bag<kFlops>, std::uint16_t> ids1;
+    std::uint16_t next1 = 0;
     for (int hole = 0; hole < kCardCount; ++hole) {
+        std::size_t hole_index = static_cast<std::size_t>(hole);
+        next.class_by_tuple_[kRound0Offset + hole_index] = intern_bag<kFlops>(
+            ids1, next1, class_by_tuple_[kRound0Offset + hole_index],
+            [&](std::array<std::uint16_t, kFlops>& children) {
+                std::size_t count = 0;
+                for (int flop = 0; flop < kCardCount; ++flop) {
+                    if (flop == hole) continue;
+                    children[count++] = raw2[pair_index(hole, flop)];
+                }
+            });
+    }
+    next.class_counts_[0] = next1;
+
+    std::map<ParentKey, std::uint16_t> parent2;
+    std::uint16_t next_class2 = 0;
+    for (int hole = 0; hole < kCardCount; ++hole) {
+        std::uint16_t parent =
+            next.class_by_tuple_[kRound0Offset +
+                                 static_cast<std::size_t>(hole)];
         for (int flop = 0; flop < kCardCount; ++flop) {
             if (flop == hole) continue;
-            std::uint16_t parent =
-                partition
-                    .class_by_tuple_[kRound1Offset + pair_index(hole, flop)];
-            for (int turn = 0; turn < kCardCount; ++turn) {
-                if (turn == hole || turn == flop) continue;
-                std::size_t index = triple_index(hole, flop, turn);
-                Class3Key key{parent, type3_by_triple[index]};
-                partition.class_by_tuple_[kRound2Offset + index] =
-                    intern_label(class3_ids, key, next_class3_id);
-            }
+            std::size_t index = pair_index(hole, flop);
+            next.class_by_tuple_[kRound1Offset + index] =
+                intern(parent2, ParentKey{parent, raw2[index]}, next_class2);
         }
     }
-    partition.class_counts_[2] = next_class3_id;
+    next.class_counts_[1] = next_class2;
 
-    return partition;
+    std::map<ParentKey, std::uint16_t> parent3;
+    std::uint16_t next_class3 = 0;
+    for_each_turn([&](int hole, int flop, int turn) {
+        std::size_t index = triple_index(hole, flop, turn);
+        std::uint16_t parent =
+            next.class_by_tuple_[kRound1Offset + pair_index(hole, flop)];
+        next.class_by_tuple_[kRound2Offset + index] =
+            intern(parent3, ParentKey{parent, raw3[index]}, next_class3);
+    });
+    next.class_counts_[2] = next_class3;
+    return next;
+}
+
+RihPartition RihPartition::compute() {
+    RihPartition trivial;
+    trivial.class_by_tuple_.assign(kStorageSize, 0);
+    return trivial.label(showdown_ranks(), false);
+}
+
+RihPartition RihPartition::refined() const {
+    const std::vector<std::uint16_t> rank = showdown_ranks();
+    RihPartition current = *this;
+    for (int pass = 0; pass < 32; ++pass) {
+        RihPartition next = current.label(rank, true);
+        if (next.class_counts_ == current.class_counts_) return next;
+        current = std::move(next);
+    }
+    // Cannot happen: a pass only splits, so the counts reach a fixed point.
+    throw std::logic_error("RihPartition::refined did not converge");
 }
 
 std::uint16_t RihPartition::class_of(std::span<const Card> own_cards) const {

@@ -1,14 +1,9 @@
-// Lossless GameShrink partition for one Rhode Island Hold'em player.
-// Ordered game isomorphism is an equivalence relation, so the bipartite
-// graph of Algorithm 1 step 3 is a disjoint union of complete bipartite
-// blocks, one per class. It has a perfect matching iff each class occurs
-// equally often on both sides, i.e. iff the sorted multisets of child
-// labels are equal (each child of a node is equally likely, and siblings
-// have equally many children). At the leaves, equal payoff over every
-// betting history reduces to an equal showdown, and matching over the
-// opponent's cards reduces to equal (W, T, L) counts. Canonical labels
-// (AHU-style tree isomorphism) therefore compute the same relation by
-// sorting instead of O(|Theta|^3) matchings.
+// GameShrink partitions for one Rhode Island Hold'em player.
+// compute() reproduces the authors' classes: equal child-label
+// multisets, and at a showdown equal (wins, ties, losses) counts.
+// That leaf test never looks at the opponent's class, so their
+// partition is lossy in the full game. Canonical labels still
+// assign dense ids in first-seen order.
 
 #pragma once
 
@@ -22,15 +17,22 @@
 
 namespace cfr::abstraction {
 
-// Lossless GameShrink partition of one player's own information.
+// Authors' GameShrink partition, and the lossless refinement of it.
 class RihPartition {
 public:
     static RihPartition compute();
+    // Authors' rule omits the opponent's class, so compute() is lossy
+    // in the full game. refined() is the coarsest fixed point of the
+    // full condition; compute() stays as the reproduction of theirs.
+    RihPartition refined() const;
     // own_cards = {hole}, {hole, flop} or {hole, flop, turn}, our card ids.
     std::uint16_t class_of(std::span<const Card> own_cards) const;
     std::uint32_t class_count(std::size_t round) const;  // round 0, 1, 2
 
 private:
+    // opponent_labels is false for the authors' (wins, ties, losses) leaf.
+    RihPartition label(std::span<const std::uint16_t> showdown_rank,
+                       bool opponent_labels) const;
     static constexpr std::size_t kRound0Offset = 0;
     static constexpr std::size_t kRound1Offset = kCardCount;
     static constexpr std::size_t kRound2Offset =

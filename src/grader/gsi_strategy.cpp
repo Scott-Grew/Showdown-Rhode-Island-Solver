@@ -72,17 +72,6 @@ int signal_index(int hole, int board0, int board1) {
            (signal_index(hole, board0) - kCardCount);
 }
 
-// GSI id of a closed round's betting: the raise count when it
-// opened with a check, the raise count plus the cap otherwise.
-int gsi_sequence(std::span<const game::Action> round_actions) {
-    int raises_used = static_cast<int>(std::count(
-        round_actions.begin(), round_actions.end(), game::kActionRaise));
-    bool opened_with_check = !round_actions.empty() &&
-                             round_actions.front() == game::kActionCallCheck;
-    return opened_with_check ? raises_used
-                             : raises_used + game::kRihMaxRaisesPerRound;
-}
-
 // 0 when no bet is faced, otherwise the number of raises so far.
 int decision_type(std::span<const game::Action> round_actions) {
     if (round_actions.empty() || round_actions.back() != game::kActionRaise)
@@ -119,11 +108,13 @@ GsiStrategy::PublicContext GsiStrategy::public_context(
     context.acting_player = round_actions.size() % game::kPlayerCount;
     if (parsed.board_cards_dealt >= 1) {
         context.board0 = gsi_card(static_cast<Card>(state.board_cards[0]));
-        context.sequence1 = gsi_sequence(parsed.round(0));
+        context.sequence1 = game::closing_sequence(parsed.round(0),
+                                                   game::kRihMaxRaisesPerRound);
     }
     if (parsed.board_cards_dealt >= 2) {
         context.board1 = gsi_card(static_cast<Card>(state.board_cards[1]));
-        context.sequence2 = gsi_sequence(parsed.round(1));
+        context.sequence2 = game::closing_sequence(parsed.round(1),
+                                                   game::kRihMaxRaisesPerRound);
     }
     return context;
 }

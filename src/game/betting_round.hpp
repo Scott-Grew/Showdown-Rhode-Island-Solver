@@ -115,6 +115,29 @@ constexpr int round_progress_count(int max_raises) {
     return 2 * max_raises + 2;
 }
 
+// Number of closing sequences under a raise cap. Check-check
+// through the capped re-raise is max_raises + 1 codes, and the
+// lines that opened with a bet add max_raises more.
+constexpr int closing_sequence_count(int max_raises) {
+    return 2 * max_raises + 1;
+}
+
+// Gilpin-Sandholm id of a closed round. Opened with a check, the
+// id is the raise count, 0..max_raises. Opened with a bet, the id
+// is max_raises above that, so the codes fill 0..2*max_raises.
+inline int closing_sequence(int raises, bool opened_with_check,
+                            int max_raises) {
+    return opened_with_check ? raises : raises + max_raises;
+}
+
+inline int closing_sequence(std::span<const Action> round_actions,
+                            int max_raises) {
+    bool opened_with_check =
+        !round_actions.empty() && round_actions.front() == kActionCallCheck;
+    return closing_sequence(raises_used(round_actions), opened_with_check,
+                            max_raises);
+}
+
 // Last betting action of the active round. Those actions are the
 // last round_len entries of history; the board card that opened
 // the round sits just before them.
@@ -136,6 +159,22 @@ inline bool round_closed(const State& state) {
     Action previous =
         state.history[static_cast<std::size_t>(state.history_len) - 2];
     return previous == kActionCallCheck || previous == kActionRaise;
+}
+
+// True when the active round's first action was a check. The
+// start of a round has no first action.
+inline bool opened_with_check(const State& state) {
+    if (state.round_len == 0) return false;
+    Action first = state.history[static_cast<std::size_t>(state.history_len) -
+                                 state.round_len];
+    return first == kActionCallCheck;
+}
+
+// Same code as round_progress on the action span, from the
+// counters apply_action keeps. One history-tail load, not a scan.
+inline int round_progress(const State& state) {
+    return static_cast<int>(state.raises_used) * 2 +
+           (opened_with_check(state) ? 1 : 0);
 }
 
 // Legal actions in ascending code order. Fold needs a bet to face,
@@ -198,9 +237,26 @@ inline void begin_next_betting_round(State& state) {
     state.round_contribution = {0, 0};
 }
 
-// Deals one card. A board card starts the next betting round.
-inline void deal_and_advance(State& state, int card) {
+// Deals one card. A board card closes the round that just finished:
+// its closing-sequence code is stored before the round counters
+// reset, so a later infoset read does not rescan the history. The
+// dealt card is already history's last entry. max_raises is the cap
+// of the round being closed; a hole-card deal ignores it.
+inline void deal_and_advance(State& state, int card, int max_raises) {
     bool board_card = state.hole_cards[0] != -1 && state.hole_cards[1] != -1;
+    if (board_card) {
+        assert(state.board_count < state.closing.size());
+        assert(state.history_len > state.round_len);
+        assert(state.history[static_cast<std::size_t>(state.history_len) - 1] ==
+               static_cast<std::uint8_t>(kChanceCardOffset + card));
+        std::size_t first_index =
+            static_cast<std::size_t>(state.history_len) - state.round_len - 1;
+        Action first_action = state.history[first_index];
+        bool opened = first_action == kActionCallCheck;
+        state.closing[state.board_count] =
+            static_cast<std::uint8_t>(closing_sequence(
+                static_cast<int>(state.raises_used), opened, max_raises));
+    }
     deal_card(state, card);
     if (board_card) begin_next_betting_round(state);
 }

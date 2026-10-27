@@ -13,6 +13,10 @@
 #include "game/card.hpp"
 #include "game/game.hpp"
 
+namespace cfr::abstraction {
+class RihPartition;
+}
+
 namespace cfr::game {
 
 // Stakes in chips: fixed bet per round, raise cap and ante.
@@ -34,6 +38,8 @@ class RhodeIslandGame {
 public:
     static constexpr std::size_t kMaxActions = 3;
 
+    // Binds the process-lifetime GameShrink partition.
+    RhodeIslandGame();
     // The empty state, before any card is dealt.
     State initial_state() const;
     // True once the hand is over, by a fold or a showdown.
@@ -51,13 +57,17 @@ public:
     // Text label of what the acting player
     // knows: cards seen and betting.
     InfosetLabel infoset_label(const State& state) const;
-    // Number of infosets, the row count of a solver table.
+    // Number of GameShrink infosets, the row count of a solver table.
     std::uint32_t infoset_count() const;
     // Dense row of the acting player's infoset, below infoset_count.
     std::uint32_t infoset_index(const State& state) const;
     // Each possible deal at a chance node with its probability.
     FixedVector<ChanceOutcome, kMaxChanceOutcomes> chance_outcomes(
         const State& state) const;
+
+private:
+    // Shared partition. class_of is an array read on the hot path.
+    const abstraction::RihPartition* partition_;
 };
 
 }

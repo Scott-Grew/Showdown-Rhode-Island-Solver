@@ -1,18 +1,19 @@
 // Rhode Island rules built on betting_round.hpp, showdowns from
-// eval3, and the suit-canonical infoset index, which gives one table
-// row to hands that differ only by a relabelling of suits.
+// eval3, and the GameShrink infoset index. A completed round is
+// stored as its closing sequence, and the cards as their class, so
+// each real infoset owns one row.
 
 #include "game/rhode_island.hpp"
 
-#include <initializer_list>
-#include <map>
-#include <vector>
 #include <array>
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 
+#include "abstraction/rih_gameshrink.hpp"
 #include "eval/eval3.hpp"
 #include "game/betting_round.hpp"
 #include "game/card.hpp"
@@ -66,91 +67,40 @@ void remember_showdown_ranks(State& state) {
     state.showdown_rank[1] = cfr::eval::evaluate_3card(hand1.data());
 }
 
-// Number of round_progress values in one round.
+// In-round progress codes, and closing sequences of a finished round.
 constexpr int kRihRoundProgressCount =
     round_progress_count(kRihMaxRaisesPerRound);
+constexpr int kRihClosingCount = closing_sequence_count(kRihMaxRaisesPerRound);
+static_assert(kRihRoundProgressCount == 8);
+static_assert(kRihClosingCount == 7);
 
-// Card id with its suit renamed to the order suits first appear in
-// the hand, so hands equal up to a suit swap get equal keys.
-std::uint32_t relabelled(int card, std::array<int, kSuitCount>& suit_map,
-                         int& next_suit) {
-    int suit = card_suit(static_cast<Card>(card));
-    if (suit_map[static_cast<std::size_t>(suit)] < 0)
-        suit_map[static_cast<std::size_t>(suit)] = next_suit++;
-    return static_cast<std::uint32_t>(card_rank(static_cast<Card>(card)) *
-                                          kSuitCount +
-                                      suit_map[static_cast<std::size_t>(suit)]);
+// One partition per process. The lossless refinement of the authors'
+// partition is built once; every RhodeIslandGame refers to it.
+const cfr::abstraction::RihPartition& shared_partition() {
+    static const cfr::abstraction::RihPartition partition =
+        cfr::abstraction::RihPartition::compute().refined();
+    return partition;
 }
 
-// Suit-isomorphism class of every ordered (hole, board) pair and
-// (hole, board, board) triple, indexed by raw card ids.
-struct SuitCanonicalTables {
-    std::vector<std::uint32_t> pair_class;
-    std::vector<std::uint32_t> triple_class;
-    std::uint32_t pair_count = 0;
-    std::uint32_t triple_count = 0;
-};
-
-// Code of a card sequence after its suits are renamed in order of
-// first appearance: the relabelled card ids as base-52 digits.
-std::uint32_t suit_canonical_code(std::initializer_list<int> cards) {
-    std::array<int, kSuitCount> suit_map = {-1, -1, -1, -1};
-    int next_suit = 0;
-    std::uint32_t code = 0;
-    for (int card : cards) {
-        code = code * kCardCount + relabelled(card, suit_map, next_suit);
+// GameShrink class of the acting player's own cards. The span length
+// is the round: hole, hole and flop, or all three.
+std::uint32_t own_class(const cfr::abstraction::RihPartition& partition,
+                        const State& state, Player player) {
+    std::array<Card, 3> cards{};
+    cards[0] = static_cast<Card>(state.hole_cards[player]);
+    std::size_t count = 1;
+    if (state.board_count >= 1) {
+        cards[count++] = static_cast<Card>(state.board_cards[0]);
     }
-    return code;
-}
-
-// Class id of a code; new codes are numbered in order of arrival.
-std::uint32_t class_of(std::map<std::uint32_t, std::uint32_t>& class_ids,
-                       std::uint32_t code, std::uint32_t& class_count) {
-    auto entry = class_ids.find(code);
-    if (entry == class_ids.end()) {
-        entry = class_ids.emplace(code, class_count++).first;
+    if (state.board_count >= 2) {
+        cards[count++] = static_cast<Card>(state.board_cards[1]);
     }
-    return entry->second;
-}
-
-// Fills both class tables by visiting every ordered deal.
-SuitCanonicalTables build_canonical_tables() {
-    SuitCanonicalTables built;
-    built.pair_class.assign(kCardCount * kCardCount, 0);
-    built.triple_class.assign(kCardCount * kCardCount * kCardCount, 0);
-    std::map<std::uint32_t, std::uint32_t> pair_ids;
-    std::map<std::uint32_t, std::uint32_t> triple_ids;
-
-    for (int hole = 0; hole < kCardCount; ++hole) {
-        for (int board0 = 0; board0 < kCardCount; ++board0) {
-            if (board0 == hole) continue;
-            std::size_t pair_index =
-                static_cast<std::size_t>(hole * kCardCount + board0);
-            built.pair_class[pair_index] =
-                class_of(pair_ids, suit_canonical_code({hole, board0}),
-                         built.pair_count);
-
-            for (int board1 = 0; board1 < kCardCount; ++board1) {
-                if (board1 == hole || board1 == board0) continue;
-                std::uint32_t triple_code =
-                    suit_canonical_code({hole, board0, board1});
-                built.triple_class[pair_index * kCardCount +
-                                   static_cast<std::size_t>(board1)] =
-                    class_of(triple_ids, triple_code, built.triple_count);
-            }
-        }
-    }
-    return built;
-}
-
-// The class tables, built on first use; a function-local static,
-// so the build is thread-safe.
-const SuitCanonicalTables& canonical_tables() {
-    static const SuitCanonicalTables tables = build_canonical_tables();
-    return tables;
+    return partition.class_of(std::span<const Card>(cards.data(), count));
 }
 
 }
+
+RhodeIslandGame::RhodeIslandGame() : partition_(&shared_partition()) {}
 
 // Antes are posted before any card is dealt.
 State RhodeIslandGame::initial_state() const {
@@ -203,7 +153,8 @@ State RhodeIslandGame::apply_action(const State& state, Action action) const {
     bool dealing = is_chance(state);
     append_action(next, action);
     if (dealing) {
-        deal_and_advance(next, action - kChanceCardOffset);
+        deal_and_advance(next, action - kChanceCardOffset,
+                         kRihMaxRaisesPerRound);
         if (next.board_count == 2) remember_showdown_ranks(next);
         return next;
     }
@@ -225,7 +176,7 @@ double RhodeIslandGame::terminal_utility(const State& state,
 }
 
 // Builds "P<player>:<hole>|<board>:<r1>;<r2>;<r3>" with full card
-// names, so labels are finer than the suit-canonical index.
+// names. Labels stay finer than the GameShrink index.
 InfosetLabel RhodeIslandGame::infoset_label(const State& state) const {
     Player acting_player = current_player(state);
     ParsedRounds parsed = parse_rounds(state);
@@ -244,66 +195,63 @@ InfosetLabel RhodeIslandGame::infoset_label(const State& state) const {
     return label;
 }
 
-// Rows of all three rounds; infoset_index has the layout.
+// Rows of the three rounds. P = 8 progress codes, S = 7 closing
+// sequences, Cr the GameShrink class count of round r:
+//
+//   round 0 | P * C0
+//   round 1 | S * P * C1
+//   round 2 | S * S * P * C2
+//
+// With the refined class counts this is 3,142,152.
 std::uint32_t RhodeIslandGame::infoset_count() const {
-    const SuitCanonicalTables& tables = canonical_tables();
-    return kRihRoundProgressCount * kRankCount +
-           kRihRoundProgressCount * kRihRoundProgressCount * tables.pair_count +
-           kRihRoundProgressCount * kRihRoundProgressCount *
-               kRihRoundProgressCount * tables.triple_count;
+    constexpr std::uint32_t kProgress =
+        static_cast<std::uint32_t>(kRihRoundProgressCount);
+    constexpr std::uint32_t kClosing =
+        static_cast<std::uint32_t>(kRihClosingCount);
+    std::uint32_t class0 = partition_->class_count(0);
+    std::uint32_t class1 = partition_->class_count(1);
+    std::uint32_t class2 = partition_->class_count(2);
+    return kProgress * class0 + kClosing * kProgress * class1 +
+           kClosing * kClosing * kProgress * class2;
 }
 
-// round_progress of one round as an unsigned table coordinate.
-static std::uint32_t progress_code(std::span<const Action> round_actions) {
-    return static_cast<std::uint32_t>(round_progress(round_actions));
-}
-
-// Row layout of the infoset table, with P = kRihRoundProgressCount:
+// Round r of the acting player, with R0 = P*C0 and R1 = S*P*C1:
 //
-//   round 1 | P * 13 rows
-//           |   keyed by progress and hole rank
-//   round 2 | P^2 * pair_count rows
-//           |   keyed by progress of rounds 1-2, class of 2 cards
-//   round 3 | P^3 * triple_count rows
-//           |   keyed by progress of rounds 1-3, class of all 3 cards
+//   round 0 | progress * C0 + class(hole)
+//   round 1 | R0 + (closing0 * P + progress) * C1 + class(hole, flop)
+//   round 2 | R0 + R1
+//           |   + ((closing0 * S + closing1) * P + progress) * C2
+//           |   + class(hole, flop, turn)
 //
-// infoset_count returns the total, 5,139,368 rows.
-//
-// Round 1 rows key on progress and rank. Later rounds key on the
-// progress of every round so far and the suit class of the cards.
+// progress is the active round. closingR was stored when round R
+// closed. Both are O(1); the class is one array read.
 std::uint32_t RhodeIslandGame::infoset_index(const State& state) const {
     Player acting_player = current_player(state);
-    ParsedRounds parsed = parse_rounds(state);
-    std::uint32_t hole_card =
-        static_cast<std::uint32_t>(state.hole_cards[acting_player]);
-    std::uint32_t round1_progress = progress_code(parsed.round(0));
+    std::uint32_t progress = static_cast<std::uint32_t>(round_progress(state));
+    std::uint32_t card_class = own_class(*partition_, state, acting_player);
+    constexpr std::uint32_t kProgress =
+        static_cast<std::uint32_t>(kRihRoundProgressCount);
+    constexpr std::uint32_t kClosing =
+        static_cast<std::uint32_t>(kRihClosingCount);
 
-    if (parsed.board_cards_dealt == 0) {
-        std::uint32_t hole_rank =
-            static_cast<std::uint32_t>(card_rank(static_cast<Card>(hole_card)));
-        return round1_progress * kRankCount + hole_rank;
+    if (state.board_count == 0) {
+        return progress * partition_->class_count(0) + card_class;
     }
 
-    const SuitCanonicalTables& tables = canonical_tables();
-    std::uint32_t round1_rows = kRihRoundProgressCount * kRankCount;
-    std::uint32_t board0 = static_cast<std::uint32_t>(state.board_cards[0]);
-    std::uint32_t pair_index = hole_card * kCardCount + board0;
-    std::uint32_t round2_betting = round1_progress * kRihRoundProgressCount +
-                                   progress_code(parsed.round(1));
-
-    if (parsed.board_cards_dealt == 1) {
-        return round1_rows + round2_betting * tables.pair_count +
-               tables.pair_class[pair_index];
+    std::uint32_t round0_rows = kProgress * partition_->class_count(0);
+    std::uint32_t closing0 = state.closing[0];
+    if (state.board_count == 1) {
+        std::uint32_t betting = closing0 * kProgress + progress;
+        return round0_rows + betting * partition_->class_count(1) + card_class;
     }
 
-    std::uint32_t round2_rows =
-        kRihRoundProgressCount * kRihRoundProgressCount * tables.pair_count;
-    std::uint32_t board1 = static_cast<std::uint32_t>(state.board_cards[1]);
-    std::uint32_t triple_index = pair_index * kCardCount + board1;
-    std::uint32_t round3_betting = round2_betting * kRihRoundProgressCount +
-                                   progress_code(parsed.round(2));
-    return round1_rows + round2_rows + round3_betting * tables.triple_count +
-           tables.triple_class[triple_index];
+    std::uint32_t round1_rows =
+        kClosing * kProgress * partition_->class_count(1);
+    std::uint32_t closing1 = state.closing[1];
+    std::uint32_t betting =
+        (closing0 * kClosing + closing1) * kProgress + progress;
+    return round0_rows + round1_rows + betting * partition_->class_count(2) +
+           card_class;
 }
 
 // Uniform over the undealt cards of the deck.

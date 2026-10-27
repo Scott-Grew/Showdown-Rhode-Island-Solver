@@ -615,3 +615,153 @@ TEST_CASE(
     });
     REQUIRE(showdown_terminals > 0);
 }
+namespace {
+using Actions = std::vector<Action>;
+State play(const RhodeIslandGame& game, State state, const Actions& line,
+           int card = -1) {
+    for (Action action : line) state = game.apply_action(state, action);
+    if (card >= 0) state = game.apply_action(state, kChanceCardOffset + card);
+    return state;
+}
+State deal_two(const RhodeIslandGame& game, int first, int second) {
+    return play(game, play(game, game.initial_state(), {}, first), {}, second);
+}
+int spare(int first, int second = -1, int third = -1) {
+    for (int card = 0; card < cfr::kCardCount; ++card)
+        if (card != first && card != second && card != third) return card;
+    return 0;
+}
+std::uint16_t cls(const cfr::abstraction::RihPartition& partition, int hole,
+                  int flop = -1, int turn = -1) {
+    std::array<cfr::Card, 3> cards{static_cast<cfr::Card>(hole)};
+    std::size_t count = 1;
+    if (flop >= 0) cards[count++] = static_cast<cfr::Card>(flop);
+    if (turn >= 0) cards[count++] = static_cast<cfr::Card>(turn);
+    return partition.class_of(std::span<const cfr::Card>(cards.data(), count));
+}
+std::pair<std::vector<Actions>, std::vector<Actions>> round_lines(
+    const RhodeIslandGame& game) {
+    std::vector<Actions> open, closed;
+    Actions prefix;
+    auto visit = [&](auto&& self, const State& node) -> void {
+        if (game.is_terminal(node)) return;
+        if (game.is_chance(node)) {
+            closed.push_back(prefix);
+            return;
+        }
+        open.push_back(prefix);
+        for (Action action : game.legal_actions(node)) {
+            prefix.push_back(action);
+            self(self, game.apply_action(node, action));
+            prefix.pop_back();
+        }
+    };
+    visit(visit, deal_two(game, 0, 1));
+    return {open, closed};
+}
+template <class Fn>
+void cross(const RhodeIslandGame& game, const std::vector<Actions>& open,
+           const std::vector<Actions>& closed, int hole, int flop, int turn,
+           Fn fn) {
+    int opponent = spare(hole, flop, turn);
+    auto reach = [&](auto&& self, State s0, State s1, int round) -> void {
+        if (round == (flop >= 0) + (turn >= 0)) {
+            for (const Actions& line : open)
+                fn(play(game, line.size() % 2 == 0 ? s0 : s1, line));
+            return;
+        }
+        int card = round == 0 ? flop : turn;
+        for (const Actions& close : closed)
+            self(self, play(game, s0, close, card), play(game, s1, close, card),
+                 round + 1);
+    };
+    reach(reach, deal_two(game, hole, opponent), deal_two(game, opponent, hole),
+          0);
+}
+}
+TEST_CASE("rhode island closing sequences are 0 through 6") {
+    RhodeIslandGame game;
+    auto lines = round_lines(game);
+    std::vector<int> codes;
+    for (const Actions& line : lines.second)
+        codes.push_back(play(game, deal_two(game, 0, 1), line, 2).closing[0]);
+    std::sort(codes.begin(), codes.end());
+    REQUIRE(codes == (std::vector<int>{0, 1, 2, 3, 4, 5, 6}));
+}
+TEST_CASE("rhode island gameshrink index hits every row once") {
+    RhodeIslandGame game;
+    const auto partition = cfr::abstraction::RihPartition::compute().refined();
+    REQUIRE(game.infoset_count() == 3142152);
+    auto [open, closed] = round_lines(game);
+    std::vector<int> rep0(partition.class_count(0), -1);
+    std::vector<int> rep1(partition.class_count(1), -1);
+    std::vector<int> rep2(partition.class_count(2), -1);
+    for (int i = 0, deck = cfr::kCardCount; i < deck * deck * deck; ++i) {
+        int hole = i / (deck * deck), flop = i / deck % deck, turn = i % deck;
+        if (rep0[cls(partition, hole)] < 0) rep0[cls(partition, hole)] = hole;
+        if (flop != hole && rep1[cls(partition, hole, flop)] < 0)
+            rep1[cls(partition, hole, flop)] = hole * 64 + flop;
+        if (flop != hole && turn != hole && turn != flop &&
+            rep2[cls(partition, hole, flop, turn)] < 0)
+            rep2[cls(partition, hole, flop, turn)] =
+                (hole * 64 + flop) * 64 + turn;
+    }
+    std::vector<int> seen(game.infoset_count(), 0);
+    int bad = 0;
+    auto mark = [&](const State& state) {
+        std::uint32_t index = game.infoset_index(state);
+        if (index >= seen.size() || seen[index] != 0) ++bad;
+        if (index < seen.size() && seen[index] == 0) seen[index] = 1;
+    };
+    for (int hole : rep0) cross(game, open, closed, hole, -1, -1, mark);
+    for (int packed : rep1)
+        cross(game, open, closed, packed / 64, packed % 64, -1, mark);
+    for (int packed : rep2)
+        cross(game, open, closed, packed / 4096, packed / 64 % 64, packed % 64,
+              mark);
+    REQUIRE(bad == 0);
+    REQUIRE(std::count(seen.begin(), seen.end(), 1) ==
+            std::ptrdiff_t(seen.size()));
+}
+TEST_CASE("rhode island infoset index matches player round betting and class") {
+    RhodeIslandGame game;
+    const auto partition = cfr::abstraction::RihPartition::compute().refined();
+    auto [open, closed] = round_lines(game);
+    std::unordered_map<std::string, std::uint32_t> by_key;
+    std::unordered_map<std::uint32_t, std::string> by_index;
+    int probes = 0, misses = 0;
+    auto consider = [&](const State& state) {
+        Player player = game.current_player(state);
+        for (int hole = 0; hole < cfr::kCardCount; ++hole) {
+            if ((state.board_count >= 1 && state.board_cards[0] == hole) ||
+                (state.board_count >= 2 && state.board_cards[1] == hole))
+                continue;
+            State probe = state;
+            probe.hole_cards[player] = static_cast<std::int8_t>(hole);
+            std::uint16_t id =
+                cls(partition, hole,
+                    state.board_count >= 1 ? state.board_cards[0] : -1,
+                    state.board_count >= 2 ? state.board_cards[1] : -1);
+            std::string key{static_cast<char>(player),
+                            static_cast<char>(state.board_count),
+                            static_cast<char>(id), static_cast<char>(id >> 8)};
+            for (std::uint8_t i = 0; i < probe.history_len; ++i)
+                if (probe.history[i] < kChanceCardOffset)
+                    key.push_back(static_cast<char>(probe.history[i]));
+            std::uint32_t index = game.infoset_index(probe);
+            ++probes;
+            auto [at_key, fresh] = by_key.emplace(key, index);
+            misses += index >= game.infoset_count() ||
+                      (!fresh && at_key->second != index);
+            auto [at_index, fresh_index] = by_index.emplace(index, key);
+            misses += index < game.infoset_count() && !fresh_index &&
+                      at_index->second != key;
+        }
+    };
+    // Preflop, then flop card 0, then turn card 1.
+    for (int step = 0; step < 3; ++step)
+        cross(game, open, closed, 2, step == 0 ? -1 : 0, step == 2 ? 1 : -1,
+              consider);
+    REQUIRE(probes > 20000);
+    REQUIRE(misses == 0);
+}

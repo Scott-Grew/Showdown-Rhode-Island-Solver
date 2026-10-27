@@ -1,12 +1,16 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
+#include <map>
 #include <span>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "abstraction/rih_gameshrink.hpp"
+#include "eval/eval3.hpp"
 #include "game/card.hpp"
 #include "grader/gsi_strategy.hpp"
 
@@ -66,4 +70,130 @@ TEST_CASE("gameshrink partition is equivalent to the published partition") {
     check(strategy, 0);
     check(strategy, 1);
     check(strategy, 2);
+}
+
+namespace {
+
+// Suits renumbered in the order they first appear in the hand.
+std::array<int, 3> suit_canonical(std::span<const int> cards) {
+    std::array<int, 4> suit_id{-1, -1, -1, -1};
+    int next = 0;
+    std::array<int, 3> out{};
+    for (std::size_t i = 0; i < cards.size(); ++i) {
+        auto card = static_cast<Card>(cards[i]);
+        int suit = cfr::card_suit(card);
+        if (suit_id[static_cast<std::size_t>(suit)] < 0)
+            suit_id[static_cast<std::size_t>(suit)] = next++;
+        out[i] =
+            cfr::card_rank(card) * 4 + suit_id[static_cast<std::size_t>(suit)];
+    }
+    return out;
+}
+
+std::uint8_t showdown(int hole, int opponent, int flop, int turn) {
+    std::array<Card, 3> mine{static_cast<Card>(hole), static_cast<Card>(flop),
+                             static_cast<Card>(turn)};
+    std::array<Card, 3> theirs{static_cast<Card>(opponent),
+                               static_cast<Card>(flop),
+                               static_cast<Card>(turn)};
+    cfr::eval::HandRank mine_rank = cfr::eval::evaluate_3card(mine.data());
+    cfr::eval::HandRank their_rank = cfr::eval::evaluate_3card(theirs.data());
+    if (mine_rank > their_rank) return 2;
+    if (mine_rank < their_rank) return 0;
+    return 1;
+}
+
+}
+
+TEST_CASE("refined partition class counts are the lossless fixed point") {
+    const RihPartition part = RihPartition::compute().refined();
+    REQUIRE(part.class_count(0) == 13);
+    REQUIRE(part.class_count(1) == 325);
+    REQUIRE(part.class_count(2) == 7969);
+}
+
+TEST_CASE("refined partition refines gameshrink and respects suits") {
+    const RihPartition authors = RihPartition::compute();
+    const RihPartition part = authors.refined();
+    std::array<std::vector<int>, 3> author_of{
+        std::vector<int>(part.class_count(0), -1),
+        std::vector<int>(part.class_count(1), -1),
+        std::vector<int>(part.class_count(2), -1)};
+    std::array<std::map<std::array<int, 3>, std::uint16_t>, 3> suit_of;
+    int refine_miss = 0;
+    int suit_miss = 0;
+    std::array<Card, 3> cards{};
+    auto note = [&](std::size_t round, std::size_t n) {
+        auto hand = std::span<const Card>(cards.data(), n);
+        std::uint16_t refined = part.class_of(hand);
+        std::uint16_t author = authors.class_of(hand);
+        int& stored = author_of[round][refined];
+        if (stored >= 0 && stored != author) ++refine_miss;
+        if (stored < 0) stored = author;
+        std::array<int, 3> raw{};
+        for (std::size_t i = 0; i < n; ++i) raw[i] = cards[i];
+        std::array<int, 3> canon =
+            suit_canonical(std::span<const int>(raw.data(), n));
+        auto [it, inserted] = suit_of[round].emplace(canon, refined);
+        if (!inserted && it->second != refined) ++suit_miss;
+    };
+    for (int hole = 0; hole < kCardCount; ++hole) {
+        cards[0] = static_cast<Card>(hole);
+        note(0, 1);
+        for (int flop = 0; flop < kCardCount; ++flop) {
+            if (flop == hole) continue;
+            cards[1] = static_cast<Card>(flop);
+            note(1, 2);
+            for (int turn = 0; turn < kCardCount; ++turn) {
+                if (turn == hole || turn == flop) continue;
+                cards[2] = static_cast<Card>(turn);
+                note(2, 3);
+            }
+        }
+    }
+    REQUIRE(refine_miss == 0);
+    REQUIRE(suit_miss == 0);
+    for (const std::vector<int>& ids : author_of)
+        for (int author : ids) REQUIRE(author >= 0);
+}
+
+TEST_CASE("refined round 3 classes share opponent outcome multisets") {
+    const RihPartition part = RihPartition::compute().refined();
+    using Sig = std::vector<std::pair<std::uint16_t, std::uint8_t>>;
+    std::vector<Sig> seen(part.class_count(2));
+    std::vector<char> have(part.class_count(2), 0);
+    int mismatches = 0;
+    std::array<Card, 3> cards{};
+    for (int hole = 0; hole < kCardCount; ++hole) {
+        for (int flop = 0; flop < kCardCount; ++flop) {
+            if (flop == hole) continue;
+            for (int turn = 0; turn < kCardCount; ++turn) {
+                if (turn == hole || turn == flop) continue;
+                cards = {static_cast<Card>(hole), static_cast<Card>(flop),
+                         static_cast<Card>(turn)};
+                std::uint16_t id = part.class_of(cards);
+                Sig sig;
+                for (int opponent = 0; opponent < kCardCount; ++opponent) {
+                    if (opponent == hole || opponent == flop ||
+                        opponent == turn) {
+                        continue;
+                    }
+                    std::array<Card, 3> opp{static_cast<Card>(opponent),
+                                            static_cast<Card>(flop),
+                                            static_cast<Card>(turn)};
+                    sig.push_back({part.class_of(opp),
+                                   showdown(hole, opponent, flop, turn)});
+                }
+                std::sort(sig.begin(), sig.end());
+                if (have[id] == 0) {
+                    seen[id] = std::move(sig);
+                    have[id] = 1;
+                } else if (seen[id] != sig) {
+                    ++mismatches;
+                }
+            }
+        }
+    }
+    REQUIRE(mismatches == 0);
+    for (char bit : have) REQUIRE(bit != 0);
 }
