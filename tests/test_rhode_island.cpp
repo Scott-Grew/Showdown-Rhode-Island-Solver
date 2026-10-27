@@ -115,6 +115,34 @@ long long count_fixed_card_engine_nodes(const RhodeIslandGame& game,
     return total;
 }
 
+struct SequenceFormSize {
+    std::array<long long, 2> infosets, sequences;
+};
+
+SequenceFormSize count_fixed_card_sequence_form_size(
+    const RhodeIslandGame& game, const State& state, Action fixed_flop_action,
+    Action fixed_turn_action, const std::array<long long, 3>& classes) {
+    SequenceFormSize totals{{0, 0}, {1, 1}};
+    auto visit = [&](auto&& self, const State& node) -> void {
+        if (game.is_terminal(node)) return;
+        if (game.is_chance(node)) {
+            Action next_card_action =
+                node.board_count == 0 ? fixed_flop_action : fixed_turn_action;
+            self(self, game.apply_action(node, next_card_action));
+            return;
+        }
+        Player player = game.current_player(node);
+        long long own_information_count = classes[node.board_count];
+        std::vector<Action> legal = game.legal_actions(node);
+        totals.infosets[player] += own_information_count;
+        totals.sequences[player] +=
+            own_information_count * static_cast<long long>(legal.size());
+        for (Action action : legal) self(self, game.apply_action(node, action));
+    };
+    visit(visit, state);
+    return totals;
+}
+
 }
 
 TEST_CASE("RIH betting-subtree node count matches combinatorial formula") {
@@ -151,6 +179,27 @@ TEST_CASE("RIH full-game node count exceeds the published 3.1e9 figure") {
     REQUIRE(betting_and_board_nodes == 6705372492LL);
     REQUIRE(full_tree_node_count == 6705372545LL);
     REQUIRE(full_tree_node_count > 3100000000LL);
+}
+
+TEST_CASE("RIH unabstracted sequence-form size matches the paper") {
+    // Gilpin & Sandholm, J. ACM 2007, p. 25:4.
+    constexpr std::array<long long, 3> kUnabstractedClasses = {52, 52 * 51,
+                                                               52 * 51 * 50};
+    RhodeIslandGame game;
+    State state = game.initial_state();
+    state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
+    SequenceFormSize size = count_fixed_card_sequence_form_size(
+        game, state, kChanceCardOffset + make_card(2, 0),
+        kChanceCardOffset + make_card(3, 0), kUnabstractedClasses);
+    long long rows = size.sequences[0] + size.infosets[1] + 1;
+    long long columns = size.sequences[1] + size.infosets[0] + 1;
+    for (std::size_t player = 0; player < 2; ++player) {
+        REQUIRE(size.infosets[player] == 26064064LL);
+        REQUIRE(size.sequences[player] == 65160161LL);
+    }
+    REQUIRE(rows == 91224226LL);
+    REQUIRE(columns == 91224226LL);
 }
 
 TEST_CASE("rhode island satisfies GameLike", "[concept]") {
