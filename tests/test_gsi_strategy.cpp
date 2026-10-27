@@ -41,11 +41,8 @@ constexpr double kGilpinSandholmRound1FoldFrequency[cfr::kRankCount] = {
 TEST_CASE(
     "gsi round-one fold frequencies reproduce the published equilibrium") {
     GsiStrategy strategy = GsiStrategy::load(CFR_GSI_DATA_DIR);
-    if (!strategy.available()) {
-        SUCCEED(
-            "GSI equilibrium data absent, see STATUS for the fetch command");
-        return;
-    }
+    INFO("GSI equilibrium data absent; run `make data/gsi/partition`");
+    REQUIRE(strategy.available());
 
     for (int rank = 0; rank < cfr::kRankCount; ++rank) {
         std::vector<double> probabilities =
@@ -58,11 +55,8 @@ TEST_CASE(
 
 TEST_CASE("gsi round-one strategy is suit invariant") {
     GsiStrategy strategy = GsiStrategy::load(CFR_GSI_DATA_DIR);
-    if (!strategy.available()) {
-        SUCCEED(
-            "GSI equilibrium data absent, see STATUS for the fetch command");
-        return;
-    }
+    INFO("GSI equilibrium data absent; run `make data/gsi/partition`");
+    REQUIRE(strategy.available());
 
     for (int rank = 0; rank < cfr::kRankCount; ++rank) {
         std::vector<double> clubs =

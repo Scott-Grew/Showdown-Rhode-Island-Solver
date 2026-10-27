@@ -63,11 +63,8 @@ TEST_CASE(
 
 TEST_CASE("rhode island walk conserves value between the two players") {
     GsiStrategy strategy = GsiStrategy::load(CFR_GSI_DATA_DIR);
-    if (!strategy.available()) {
-        SUCCEED(
-            "GSI equilibrium data absent, see STATUS for the fetch command");
-        return;
-    }
+    INFO("GSI equilibrium data absent; run `make data/gsi/partition`");
+    REQUIRE(strategy.available());
     cfr::solver::RihStrategyQuery query = query_for(strategy);
     REQUIRE_THAT(cfr::solver::rih_strategy_value(query, 0) +
                      cfr::solver::rih_strategy_value(query, 1),
@@ -77,11 +74,8 @@ TEST_CASE("rhode island walk conserves value between the two players") {
 TEST_CASE(
     "published equilibrium is an exact best response in betting round one") {
     GsiStrategy strategy = GsiStrategy::load(CFR_GSI_DATA_DIR);
-    if (!strategy.available()) {
-        SUCCEED(
-            "GSI equilibrium data absent, see STATUS for the fetch command");
-        return;
-    }
+    INFO("GSI equilibrium data absent; run `make data/gsi/partition`");
+    REQUIRE(strategy.available());
     cfr::solver::RihStrategyQuery query = query_for(strategy);
 
     for (Player player = 0; player < kPlayerCount; ++player) {
