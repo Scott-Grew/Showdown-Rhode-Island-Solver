@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "abstraction/rih_gameshrink.hpp"
 #include "game/card.hpp"
 #include "game/game.hpp"
 #include "game/rhode_island.hpp"
@@ -143,6 +144,19 @@ SequenceFormSize count_fixed_card_sequence_form_size(
     return totals;
 }
 
+// Sequence-form size with classes[r] own-information values in round
+// r. Betting does not depend on the cards, so any fixed deal will do.
+SequenceFormSize rih_sequence_form_size(
+    const std::array<long long, 3>& classes) {
+    RhodeIslandGame game;
+    State state = game.initial_state();
+    state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
+    state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
+    return count_fixed_card_sequence_form_size(
+        game, state, kChanceCardOffset + make_card(2, 0),
+        kChanceCardOffset + make_card(3, 0), classes);
+}
+
 }
 
 TEST_CASE("RIH betting-subtree node count matches combinatorial formula") {
@@ -183,15 +197,7 @@ TEST_CASE("RIH full-game node count exceeds the published 3.1e9 figure") {
 
 TEST_CASE("RIH unabstracted sequence-form size matches the paper") {
     // Gilpin & Sandholm, J. ACM 2007, p. 25:4.
-    constexpr std::array<long long, 3> kUnabstractedClasses = {52, 52 * 51,
-                                                               52 * 51 * 50};
-    RhodeIslandGame game;
-    State state = game.initial_state();
-    state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
-    state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
-    SequenceFormSize size = count_fixed_card_sequence_form_size(
-        game, state, kChanceCardOffset + make_card(2, 0),
-        kChanceCardOffset + make_card(3, 0), kUnabstractedClasses);
+    SequenceFormSize size = rih_sequence_form_size({52, 52 * 51, 52 * 51 * 50});
     long long rows = size.sequences[0] + size.infosets[1] + 1;
     long long columns = size.sequences[1] + size.infosets[0] + 1;
     for (std::size_t player = 0; player < 2; ++player) {
@@ -200,6 +206,18 @@ TEST_CASE("RIH unabstracted sequence-form size matches the paper") {
     }
     REQUIRE(rows == 91224226LL);
     REQUIRE(columns == 91224226LL);
+}
+
+TEST_CASE("RIH GameShrink sequence-form size matches the paper") {
+    // Gilpin & Sandholm, J. ACM 2007, p. 25:4: 1,237,238 rows and
+    // columns after GameShrink.
+    cfr::abstraction::RihPartition partition =
+        cfr::abstraction::RihPartition::compute();
+    SequenceFormSize size = rih_sequence_form_size({partition.class_count(0),
+                                                    partition.class_count(1),
+                                                    partition.class_count(2)});
+    REQUIRE(size.sequences[0] + size.infosets[1] + 1 == 1237238LL);
+    REQUIRE(size.sequences[1] + size.infosets[0] + 1 == 1237238LL);
 }
 
 TEST_CASE("rhode island satisfies GameLike", "[concept]") {
