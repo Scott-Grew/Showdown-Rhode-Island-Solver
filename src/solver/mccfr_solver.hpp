@@ -216,8 +216,8 @@ private:
     template <bool Concurrent>
     void run_iteration_range(int iteration_count, TraversalContext& context) {
         for (int i = 0; i < iteration_count; ++i) {
-            for (game::Player traverser = 0;
-                 traverser < game::kPlayerCount; ++traverser) {
+            for (game::Player traverser = 0; traverser < game::kPlayerCount;
+                 ++traverser) {
                 traverse<Concurrent>(game_.initial_state(), traverser, context);
             }
         }

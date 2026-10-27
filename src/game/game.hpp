@@ -20,7 +20,9 @@ using InfosetLabel = std::string;
 
 inline constexpr Player kPlayerCount = 2;
 
-constexpr Player opponent(Player player) { return kPlayerCount - 1 - player; }
+constexpr Player opponent(Player player) {
+    return kPlayerCount - 1 - player;
+}
 
 // Fixed capacities of the State arrays below.
 inline constexpr std::size_t kMaxHistory = 32;
