@@ -29,7 +29,8 @@ data/gsi/partition:
 	tmp_dir=$$(mktemp -d /tmp/gsi.XXXXXX); \
 	trap 'rm -f "$$tmp_jar"; rm -rf "$$tmp_dir"' EXIT INT TERM; \
 	echo "downloading GSI data from $(GSI_JAR_URL)"; \
-	if ! curl -fsSL -o "$$tmp_jar" "$(GSI_JAR_URL)"; then \
+	if ! curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 \
+		--connect-timeout 30 -o "$$tmp_jar" "$(GSI_JAR_URL)"; then \
 		echo "error: failed to download GSI.jar from $(GSI_JAR_URL)"; \
 		exit 1; \
 	fi; \

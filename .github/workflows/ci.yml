@@ -12,5 +12,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      # The published equilibrium comes from the authors' server, which is
+      # slow; keep it between runs, keyed on the Makefile that pins it.
+      - uses: actions/cache@v4
+        with:
+          path: data/gsi
+          key: gsi-${{ hashFiles('Makefile') }}
       - name: make test
         run: make test
