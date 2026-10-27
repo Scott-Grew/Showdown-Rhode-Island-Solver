@@ -18,9 +18,11 @@ msd() {
 
 if [ "${2:-}" = headline ]; then
   : >"$d/rows"
+  : >"$d/times"
   for seed in 1 2 3 4 5; do
     "$m" --train 409600000 "$d/ck" "$d/lg" "$seed" 16 >"$d/out"
     awk '{gsub(/,/,"",$4); print $1,$4}' "$d/out" >>"$d/rows"
+    awk '$5=="train"{s+=$6} END{print s}' "$d/out" >>"$d/times"
   done
   awk '{k=$1; e[k,c[k]++]=$2; s[k]+=$2}
     END{for(k in s){n=c[k]; m=s[k]/n; v=0
@@ -29,6 +31,8 @@ if [ "${2:-}" = headline ]; then
     "$d/rows" >"$d/sum"
   echo "iters  exploitability"
   sort -n "$d/sum"
+  stats=$(msd "$d/times")
+  echo "training  ${stats% *} ± ${stats#* } s"
   exit 0
 fi
 
