@@ -4,6 +4,7 @@
 #include "grader/gsi_strategy.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <fstream>
 #include <utility>
 
@@ -248,6 +249,25 @@ std::vector<double> GsiStrategy::action_probabilities(
     write_slots(context.acting_player, key_for(context, hole),
                 context.decision_type, probabilities);
     return probabilities;
+}
+
+std::uint16_t GsiStrategy::signal_class(std::span<const Card> own_cards) const {
+    assert(available_);
+    assert(own_cards.size() >= 1 && own_cards.size() <= 3);
+    int hole = gsi_card(own_cards[0]);
+    if (own_cards.size() == 1) {
+        return signal_class_[static_cast<std::size_t>(signal_index(hole))];
+    }
+
+    int board0 = gsi_card(own_cards[1]);
+    if (own_cards.size() == 2) {
+        return signal_class_[static_cast<std::size_t>(
+            signal_index(hole, board0))];
+    }
+
+    int board1 = gsi_card(own_cards[2]);
+    return signal_class_[static_cast<std::size_t>(
+        signal_index(hole, board0, board1))];
 }
 
 // Skips hole cards that are on the board; their entries stay

@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "game/card.hpp"
 #include "game/game.hpp"
 
 namespace cfr::grader {
@@ -38,6 +39,9 @@ public:
     // Strategy of the acting player at
     // state, one entry per legal action.
     std::vector<double> action_probabilities(const game::State& state) const;
+    // Class id from the published partition for {hole}, {hole, flop}
+    // or {hole, flop, turn} in our card ids.
+    std::uint16_t signal_class(std::span<const Card> own_cards) const;
 
     // Strategy of acting_player at state for every hole card, laid
     // out as card * action_count + action. Board cards stay zero.
