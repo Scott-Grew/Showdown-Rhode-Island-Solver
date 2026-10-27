@@ -1,4 +1,5 @@
-.PHONY: build test test-gcc format-check verify-discovery asan tsan clean
+.PHONY: build test test-gcc format-check verify-discovery asan tsan clean \
+	bench headline
 
 RELEASE_DIR := .build/release
 ASAN_DIR := .build/asan
@@ -14,6 +15,14 @@ format-check:
 build:
 	cmake -B $(RELEASE_DIR) -DCMAKE_BUILD_TYPE=Release
 	cmake --build $(RELEASE_DIR)
+
+# Release build, then partition timing, training throughput, and scaling.
+bench: build
+	sh bench/bench.sh "$(RELEASE_DIR)/cfr_measure"
+
+# About 30 minutes: five seeds, 16 threads, 409.6M iterations.
+headline: build
+	sh bench/bench.sh "$(RELEASE_DIR)/cfr_measure" headline
 
 data/gsi/partition:
 	@tmp_jar=$$(mktemp /tmp/gsi.XXXXXX.jar); \
