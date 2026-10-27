@@ -38,13 +38,13 @@ TEST_CASE("leduc infoset count is measured and stable") {
 TEST_CASE("leduc infoset label hides opponent card") {
     LeducGame game;
     std::map<
-        std::tuple<int, int, int, std::vector<Action>, std::vector<Action>>,
+        std::tuple<Player, int, int, std::vector<Action>, std::vector<Action>>,
         std::set<InfosetLabel>>
         keys_by_group;
 
     walk(game, game.initial_state(), [&](const State& s) {
         if (game.is_terminal(s) || game.is_chance(s)) return;
-        int player = game.current_player(s);
+        Player player = game.current_player(s);
         int own_card = s.hole_cards[player];
         int board_card = s.board_count == 0 ? -1 : s.board_cards[0];
 

@@ -42,8 +42,10 @@ cfr::solver::RihStrategyQuery player0_bets_only_in_round(int target_round) {
                                      parsed.board_cards_dealt == target_round
                                  ? 1
                                  : 0;
-        for (int card = 0; card < cfr::kCardCount; ++card)
-            probabilities[card * action_count + choice] = 1.0;
+        for (int card = 0; card < cfr::kCardCount; ++card) {
+            std::size_t card_index = static_cast<std::size_t>(card);
+            probabilities[card_index * action_count + choice] = 1.0;
+        }
     };
 }
 
@@ -82,7 +84,7 @@ TEST_CASE(
     }
     cfr::solver::RihStrategyQuery query = query_for(strategy);
 
-    for (Player player = 0; player < 2; ++player) {
+    for (Player player = 0; player < kPlayerCount; ++player) {
         double follow = cfr::solver::rih_strategy_value(query, player);
         double deviate =
             cfr::solver::rih_best_response_value_in_round(query, player, 0);

@@ -4,7 +4,9 @@
 #include "game/leduc.hpp"
 
 #include <array>
+#include <cassert>
 #include <cstddef>
+#include <optional>
 #include <string>
 
 #include "game/betting_round.hpp"
@@ -30,9 +32,9 @@ int leduc_card_rank(int card) {
     return card / kLeducSuitCount;
 }
 
-// Showdown winner, or kNoWinner on a tie. Pairing the board beats
+// Showdown winner, or std::nullopt on a tie. Pairing the board beats
 // any unpaired hand, then the higher rank wins.
-Player showdown_winner(const State& state) {
+std::optional<Player> showdown_winner(const State& state) {
     int board_rank = leduc_card_rank(state.board_cards[0]);
     int rank0 = leduc_card_rank(state.hole_cards[0]);
     int rank1 = leduc_card_rank(state.hole_cards[1]);
@@ -40,7 +42,7 @@ Player showdown_winner(const State& state) {
     bool pair1 = rank1 == board_rank;
     if (pair0 != pair1) return pair0 ? 0 : 1;
     if (rank0 != rank1) return rank0 > rank1 ? 0 : 1;
-    return kNoWinner;
+    return std::nullopt;
 }
 
 // Rank letter for infoset labels; suits are not shown.
@@ -97,9 +99,9 @@ bool LeducGame::is_terminal(const State& state) const {
     return folded(parsed.round(1)) || round_closed(parsed.round(1));
 }
 
-// Player to act in the active round, or -1 at a chance node.
+// Player to act in the active round.
 Player LeducGame::current_player(const State& state) const {
-    if (is_chance(state)) return kChancePlayer;
+    assert(!is_chance(state) && !is_terminal(state));
     ParsedRounds parsed = parse_rounds(state);
     return round_acting_player(active_round_actions(parsed));
 }
@@ -129,8 +131,8 @@ double LeducGame::terminal_utility(const State& state, Player player) const {
     std::span<const Action> final_round = active_round_actions(parsed);
 
     if (folded(final_round)) {
-        Player folder = static_cast<Player>((final_round.size() - 1) % 2);
-        return settle(contributions, 1 - folder, player);
+        Player folder = (final_round.size() - 1) % kPlayerCount;
+        return settle(contributions, opponent(folder), player);
     }
 
     return settle(contributions, showdown_winner(state), player);

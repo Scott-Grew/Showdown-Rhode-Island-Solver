@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <utility>
@@ -99,7 +100,7 @@ inline bool round_closed(std::span<const Action> round_actions) {
 
 // Player to act in this round. Player 0 opens every round.
 inline Player round_acting_player(std::span<const Action> round_actions) {
-    return static_cast<Player>(round_actions.size() % 2);
+    return round_actions.size() % kPlayerCount;
 }
 
 // Number of bets and raises in the round; an opening bet counts.
@@ -144,7 +145,7 @@ inline void apply_round_contributions(std::span<const Action> round_actions,
     std::array<int, 2> round_contributions = {0, 0};
     int level_to_match = 0;
     for (std::size_t index = 0; index < round_actions.size(); ++index) {
-        Player acting_player = static_cast<Player>(index % 2);
+        Player acting_player = index % kPlayerCount;
         Action action = round_actions[index];
         if (action == kActionRaise) {
             level_to_match += bet_size;
@@ -157,15 +158,13 @@ inline void apply_round_contributions(std::span<const Action> round_actions,
     contributions[1] += round_contributions[1];
 }
 
-// Showdown winner when the hands tie.
-constexpr Player kNoWinner = -1;
-
 // Payoff in chips to player. The winner gains the loser's
-// contribution, and kNoWinner is a tie that pays zero.
-inline double settle(const std::array<int, 2>& contributions, Player winner,
-                     Player player) {
-    if (winner == kNoWinner) return 0.0;
-    if (player == winner) return static_cast<double>(contributions[1 - winner]);
+// contribution, and std::nullopt is a tie that pays zero.
+inline double settle(const std::array<int, 2>& contributions,
+                     std::optional<Player> winner, Player player) {
+    if (!winner.has_value()) return 0.0;
+    if (player == *winner)
+        return static_cast<double>(contributions[opponent(*winner)]);
     return -static_cast<double>(contributions[player]);
 }
 

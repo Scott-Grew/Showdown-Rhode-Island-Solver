@@ -33,15 +33,17 @@ struct BoardRanks {
 BoardRanks rank_every_hole_card(int board0, int board1) {
     BoardRanks ranks;
     for (int card = 0; card < kCardCount; ++card) {
+        std::size_t card_index = static_cast<std::size_t>(card);
         std::array<Card, 3> hand = {static_cast<Card>(card),
                                     static_cast<Card>(board0),
                                     static_cast<Card>(board1)};
-        ranks.hand_rank[card] = eval::evaluate_3card(hand.data());
-        ranks.cards_by_rank[card] = card;
+        ranks.hand_rank[card_index] = eval::evaluate_3card(hand.data());
+        ranks.cards_by_rank[card_index] = card;
     }
     std::sort(ranks.cards_by_rank.begin(), ranks.cards_by_rank.end(),
               [&ranks](int left, int right) {
-                  return ranks.hand_rank[left] < ranks.hand_rank[right];
+                  return ranks.hand_rank[static_cast<std::size_t>(left)] <
+                         ranks.hand_rank[static_cast<std::size_t>(right)];
               });
     return ranks;
 }
@@ -64,7 +66,7 @@ public:
                      int deviation_round)
         : opponent_strategy_(opponent_strategy),
           responder_(responder),
-          opponent_(1 - responder),
+          opponent_(opponent(responder)),
           maximize_(policy == ResponderPolicy::kBestResponse),
           deviation_round_(deviation_round) {}
 
@@ -110,7 +112,7 @@ private:
 
         RihCardVector value;
         if (folded(final_round)) {
-            Player folder = static_cast<Player>((final_round.size() - 1) % 2);
+            Player folder = (final_round.size() - 1) % kPlayerCount;
             value = fold_value(state, folder, contributions, opponent_reach);
         } else {
             double stake = static_cast<double>(contributions[responder_]);
@@ -128,8 +130,8 @@ private:
         double board_multiplicity = undealt_board_multiplicity(state);
         int pot = contributions[0] + contributions[1];
         double payoff =
-            responder_ == 1 - folder
-                ? static_cast<double>(pot - contributions[1 - folder])
+            responder_ == opponent(folder)
+                ? static_cast<double>(pot - contributions[opponent(folder)])
                 : -static_cast<double>(contributions[responder_]);
         double total_reach =
             std::accumulate(opponent_reach.begin(), opponent_reach.end(), 0.0);

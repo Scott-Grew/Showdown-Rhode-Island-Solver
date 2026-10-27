@@ -25,9 +25,10 @@ NaiveRank naive_evaluate_3card(const Card* cards) {
     std::array<int, 3> ranks;
     std::array<int, 3> suits;
     for (int i = 0; i < 3; ++i) {
-        ranks[i] = card_rank(cards[i]);
-        suits[i] = card_suit(cards[i]);
-        ++rank_counts[ranks[i]];
+        std::size_t card_index = static_cast<std::size_t>(i);
+        ranks[card_index] = card_rank(cards[card_index]);
+        suits[card_index] = card_suit(cards[card_index]);
+        ++rank_counts[static_cast<std::size_t>(ranks[card_index])];
     }
 
     bool is_flush = suits[0] == suits[1] && suits[1] == suits[2];
@@ -43,8 +44,9 @@ NaiveRank naive_evaluate_3card(const Card* cards) {
 
     std::vector<std::pair<int, int>> count_rank_pairs;
     for (int rank = 0; rank < kRankCount; ++rank) {
-        if (rank_counts[rank] > 0)
-            count_rank_pairs.emplace_back(rank_counts[rank], rank);
+        std::size_t rank_index = static_cast<std::size_t>(rank);
+        if (rank_counts[rank_index] > 0)
+            count_rank_pairs.emplace_back(rank_counts[rank_index], rank);
     }
     std::sort(count_rank_pairs.begin(), count_rank_pairs.end(),
               [](const auto& a, const auto& b) {

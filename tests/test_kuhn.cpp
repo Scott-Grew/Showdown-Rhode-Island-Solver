@@ -36,12 +36,12 @@ TEST_CASE("kuhn exactly 12 infosets") {
 
 TEST_CASE("kuhn infoset label hides opponent card") {
     KuhnGame game;
-    std::map<std::tuple<int, int, std::vector<int>>, std::set<InfosetLabel>>
+    std::map<std::tuple<Player, int, std::vector<int>>, std::set<InfosetLabel>>
         keys_by_group;
 
     walk(game, game.initial_state(), [&](const State& s) {
         if (game.is_terminal(s) || game.is_chance(s)) return;
-        int player = game.current_player(s);
+        Player player = game.current_player(s);
         int own_card = s.hole_cards[player];
         std::vector<int> betting;
         for (std::uint8_t index = 2; index < s.history_len; ++index)

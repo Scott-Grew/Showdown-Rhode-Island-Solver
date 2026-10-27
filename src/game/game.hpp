@@ -14,9 +14,13 @@
 
 namespace cfr::game {
 
-using Player = int;
+using Player = std::size_t;
 using Action = int;
 using InfosetLabel = std::string;
+
+inline constexpr Player kPlayerCount = 2;
+
+constexpr Player opponent(Player player) { return kPlayerCount - 1 - player; }
 
 // Fixed capacities of the State arrays below.
 inline constexpr std::size_t kMaxHistory = 32;
@@ -38,9 +42,6 @@ struct ChanceOutcome {
     Action action;
     double probability;
 };
-
-// What current_player returns at a chance node.
-inline constexpr Player kChancePlayer = -1;
 
 // What a solver needs from a game. infoset_index must be below
 // infoset_count, and equal for states the acting player cannot

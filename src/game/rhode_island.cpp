@@ -8,7 +8,9 @@
 #include <map>
 #include <vector>
 #include <array>
+#include <cassert>
 #include <cstddef>
+#include <optional>
 #include <string>
 
 #include "eval/eval3.hpp"
@@ -53,9 +55,9 @@ std::array<int, 2> rih_contributions(const State& state) {
 
 namespace {
 
-// Winner by three-card hand rank over hole card plus board, or -1
-// on a tie.
-Player showdown_winner(const State& state) {
+// Winner by three-card hand rank over hole card plus board, or std::nullopt on
+// a tie.
+std::optional<Player> showdown_winner(const State& state) {
     std::array<Card, 3> hand0 = {static_cast<Card>(state.hole_cards[0]),
                                  static_cast<Card>(state.board_cards[0]),
                                  static_cast<Card>(state.board_cards[1])};
@@ -64,7 +66,7 @@ Player showdown_winner(const State& state) {
                                  static_cast<Card>(state.board_cards[1])};
     cfr::eval::HandRank rank0 = cfr::eval::evaluate_3card(hand0.data());
     cfr::eval::HandRank rank1 = cfr::eval::evaluate_3card(hand1.data());
-    if (rank0 == rank1) return kNoWinner;
+    if (rank0 == rank1) return std::nullopt;
     return rank0 > rank1 ? 0 : 1;
 }
 
@@ -178,9 +180,9 @@ bool RhodeIslandGame::is_terminal(const State& state) const {
     return folded(active) || round_closed(active);
 }
 
-// Player to act in the active round, or -1 at a chance node.
+// Player to act in the active round.
 Player RhodeIslandGame::current_player(const State& state) const {
-    if (is_chance(state)) return kChancePlayer;
+    assert(!is_chance(state) && !is_terminal(state));
     ParsedRounds parsed = parse_rounds(state);
     return round_acting_player(active_round_actions(parsed));
 }
@@ -211,8 +213,8 @@ double RhodeIslandGame::terminal_utility(const State& state,
     std::span<const Action> final_round = active_round_actions(parsed);
 
     if (folded(final_round)) {
-        Player folder = static_cast<Player>((final_round.size() - 1) % 2);
-        return settle(contributions, 1 - folder, player);
+        Player folder = (final_round.size() - 1) % kPlayerCount;
+        return settle(contributions, opponent(folder), player);
     }
 
     return settle(contributions, showdown_winner(state), player);

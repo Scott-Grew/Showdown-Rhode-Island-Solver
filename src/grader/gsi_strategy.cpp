@@ -115,7 +115,7 @@ GsiStrategy::PublicContext GsiStrategy::public_context(
     PublicContext context;
     context.board_cards_dealt = parsed.board_cards_dealt;
     context.decision_type = decision_type(round_actions);
-    context.acting_player = static_cast<game::Player>(round_actions.size() % 2);
+    context.acting_player = round_actions.size() % game::kPlayerCount;
     if (parsed.board_cards_dealt >= 1) {
         context.board0 = gsi_card(static_cast<Card>(state.board_cards[0]));
         context.sequence1 = gsi_sequence(parsed.round(0));
@@ -173,7 +173,7 @@ void GsiStrategy::write_slots(game::Player acting_player, std::uint32_t key,
             double probability = std::max(
                 0.0, static_cast<double>(
                          entry->second[static_cast<std::size_t>(slot)]));
-            destination[slot - begin] = probability;
+            destination[static_cast<std::size_t>(slot - begin)] = probability;
             total += probability;
         }
     }

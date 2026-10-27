@@ -43,7 +43,7 @@ public:
     bool is_terminal(const State& state) const;
     // True while a card is due to be dealt.
     bool is_chance(const State& state) const;
-    // Player to act, or -1 at a chance node.
+    // Player to act at a decision node.
     Player current_player(const State& state) const;
     // Legal actions at a decision node, in table column order.
     std::vector<Action> legal_actions(const State& state) const;

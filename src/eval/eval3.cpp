@@ -81,9 +81,10 @@ struct RankGroups {
 // Groups the ranks from a count per rank.
 RankGroups group_ranks(const std::array<int, kRankCount>& rank_counts) {
     RankGroups groups;
-    int single_count = 0;
+    std::size_t single_count = 0;
     for (int rank = 0; rank < kRankCount; ++rank) {
-        switch (rank_counts[rank]) {
+        std::size_t rank_index = static_cast<std::size_t>(rank);
+        switch (rank_counts[rank_index]) {
             case 3: groups.trip_rank = rank; break;
             case 2: groups.pair_rank = rank; break;
             case 1: groups.single_ranks[single_count++] = rank; break;
@@ -108,7 +109,7 @@ HandRank evaluate_3card(const Card* cards) {
     int first_suit = card_suit(cards[0]);
     for (int i = 0; i < 3; ++i) {
         int rank = card_rank(cards[i]);
-        ++rank_counts[rank];
+        ++rank_counts[static_cast<std::size_t>(rank)];
         rank_bitmask |= 1u << rank;
         if (card_suit(cards[i]) != first_suit) is_flush = false;
     }

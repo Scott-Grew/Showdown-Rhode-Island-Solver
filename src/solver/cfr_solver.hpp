@@ -78,7 +78,7 @@ struct VanillaRules {
 struct CfrPlusRules {
     // Player 1 updates on odd iterations, player 0 on even ones.
     static bool updates(int iteration, game::Player acting_player) {
-        return acting_player == iteration % 2;
+        return acting_player == static_cast<game::Player>(iteration % 2);
     }
 
     // Adds the increments and floors each regret at zero.

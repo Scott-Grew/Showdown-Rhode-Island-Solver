@@ -6,14 +6,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_compile_options(-Wall -Wextra -Werror)
-
-include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag(-mavx2 CFR_HAS_AVX2_FLAG)
-if(CFR_HAS_AVX2_FLAG)
-    add_compile_options(-mavx2)
-endif()
-
 find_package(Threads REQUIRED)
 
 include(FetchContent)
@@ -25,6 +17,13 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(Catch2)
+
+add_compile_options(-Wall -Wextra -Werror -Wconversion -Wsign-conversion -Wshadow)
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-mavx2 CFR_HAS_AVX2_FLAG)
+if(CFR_HAS_AVX2_FLAG)
+    add_compile_options(-mavx2)
+endif()
 
 add_library(cfr_game STATIC
     src/game/kuhn.cpp

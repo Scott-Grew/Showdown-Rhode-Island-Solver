@@ -3,6 +3,7 @@
 
 #include "game/kuhn.hpp"
 
+#include <cassert>
 #include <string>
 
 namespace cfr::game {
@@ -69,10 +70,9 @@ bool KuhnGame::is_terminal(const State& state) const {
     return true;
 }
 
-// Player 0 opens and also answers a bet made after a check; -1 at
-// a chance node.
+// Player 0 opens and also answers a bet made after a check.
 Player KuhnGame::current_player(const State& state) const {
-    if (is_chance(state)) return kChancePlayer;
+    assert(!is_chance(state) && !is_terminal(state));
     std::vector<Action> betting = betting_history(state);
     if (betting.empty()) return 0;
     if (betting.size() == 1) return 1;
@@ -97,9 +97,9 @@ State KuhnGame::apply_action(const State& state, Action action) const {
     State next = state;
     if (is_chance(state)) {
         if (next.hole_cards[0] == -1) {
-            next.hole_cards[0] = action;
+            next.hole_cards[0] = static_cast<std::int8_t>(action);
         } else {
-            next.hole_cards[1] = action;
+            next.hole_cards[1] = static_cast<std::int8_t>(action);
         }
         next.history[next.history_len++] = static_cast<std::uint8_t>(action);
         return next;

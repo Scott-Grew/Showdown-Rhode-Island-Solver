@@ -109,7 +109,7 @@ std::optional<double> play_hand(const RhodeIslandGame& game,
     State state = game.initial_state();
     state = game.apply_action(state, kChanceCardOffset + deck[0]);
     state = game.apply_action(state, kChanceCardOffset + deck[1]);
-    int next_board_card = kHoleCardsDealt;
+    std::size_t next_board_card = static_cast<std::size_t>(kHoleCardsDealt);
 
     while (!game.is_terminal(state)) {
         if (game.is_chance(state)) {
