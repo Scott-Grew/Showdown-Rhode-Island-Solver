@@ -1,5 +1,3 @@
-// Test oracle: Kuhn poker rules, checked for payoffs, infosets and actions.
-
 #include "oracles/kuhn.hpp"
 
 #include <cassert>
@@ -14,7 +12,6 @@ namespace {
 constexpr int kKuhnBettingProgressCount = 4;
 constexpr std::uint8_t kKuhnDealtCardCount = 2;
 
-// Card letter for infoset labels.
 std::string card_name(int card) {
     switch (card) {
         case kKuhnJack: return "J";
@@ -24,7 +21,6 @@ std::string card_name(int card) {
     return "?";
 }
 
-// Action word for infoset labels.
 std::string action_name(Action action) {
     switch (action) {
         case kKuhnActionCheck: return "check";
@@ -37,7 +33,6 @@ std::string action_name(Action action) {
 
 }
 
-// Copies the history after its leading dealt-card entries.
 FixedVector<Action, KuhnGame::kMaxBettingActions> KuhnGame::betting_history(
     const State& state) {
     FixedVector<Action, kMaxBettingActions> betting;
@@ -48,12 +43,10 @@ FixedVector<Action, KuhnGame::kMaxBettingActions> KuhnGame::betting_history(
     return betting;
 }
 
-// A default State: no cards and an empty history.
 State KuhnGame::initial_state() const {
     return State{};
 }
 
-// True while either hole card is still -1.
 bool KuhnGame::is_chance(const State& state) const {
     return state.hole_cards[0] == -1 || state.hole_cards[1] == -1;
 }
@@ -70,7 +63,6 @@ bool KuhnGame::is_terminal(const State& state) const {
     return true;
 }
 
-// Player 0 opens and also answers a bet made after a check.
 Player KuhnGame::current_player(const State& state) const {
     assert(!is_chance(state) && !is_terminal(state));
     auto betting = betting_history(state);
@@ -79,7 +71,6 @@ Player KuhnGame::current_player(const State& state) const {
     return 0;
 }
 
-// Check or bet until someone bets, then call or fold.
 FixedVector<Action, KuhnGame::kMaxActions> KuhnGame::legal_actions(
     const State& state) const {
     auto betting = betting_history(state);
@@ -92,8 +83,6 @@ FixedVector<Action, KuhnGame::kMaxActions> KuhnGame::legal_actions(
     return {kKuhnActionCall, kKuhnActionFold};
 }
 
-// At a chance node the action is the card id dealt to the next
-// empty hand; every action is appended to the history.
 State KuhnGame::apply_action(const State& state, Action action) const {
     State next = state;
     if (is_chance(state)) {
@@ -132,13 +121,11 @@ double KuhnGame::player0_utility(const State& state) {
     return -1.0;
 }
 
-// Player 1 receives the negative of player 0's payoff.
 double KuhnGame::terminal_utility(const State& state, Player player) const {
     double utility = player0_utility(state);
     return player == 0 ? utility : -utility;
 }
 
-// Builds "P<player>:<card>:<actions>" for the acting player.
 InfosetLabel KuhnGame::infoset_label(const State& state) const {
     Player acting_player = current_player(state);
     auto betting = betting_history(state);
@@ -151,7 +138,6 @@ InfosetLabel KuhnGame::infoset_label(const State& state) const {
     return label;
 }
 
-// 0 opening, 1 after a check, 2 after a bet, 3 after check then bet.
 int KuhnGame::betting_progress(
     const FixedVector<Action, kMaxBettingActions>& betting) {
     if (betting.empty()) return 0;
@@ -159,12 +145,10 @@ int KuhnGame::betting_progress(
     return 3;
 }
 
-// Betting progress values times possible hole cards.
 std::uint32_t KuhnGame::infoset_count() const {
     return kKuhnBettingProgressCount * kKuhnDeckSize;
 }
 
-// Row is betting progress * deck size + the acting player's card.
 std::uint32_t KuhnGame::infoset_index(const State& state) const {
     Player acting_player = current_player(state);
     auto betting = betting_history(state);

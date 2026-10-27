@@ -1,6 +1,5 @@
-// The published-strategy reader: round-one frequencies and suit
-// invariance. Each test passes without checking anything when the
-// GSI.jar data files are absent.
+// Published round-one fold frequencies, and suit invariance of that row.
+// Requires the GSI.jar files (make data/gsi/partition).
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -31,6 +30,7 @@ State facing_opening_raise(int hole_rank, int hole_suit) {
     return game.apply_action(state, kActionRaise);
 }
 
+// Gilpin and Sandholm's published round-one fold frequencies.
 constexpr double kGilpinSandholmRound1FoldFrequency[cfr::kRankCount] = {
     1.0,         0.996309531, 0.985427557, 0.951675343, 0.777605156,
     0.576978827, 0.731294,    0.563508,    0.171509,    0.0,
@@ -38,22 +38,7 @@ constexpr double kGilpinSandholmRound1FoldFrequency[cfr::kRankCount] = {
 
 }
 
-TEST_CASE(
-    "gsi round-one fold frequencies reproduce the published equilibrium") {
-    GsiStrategy strategy = GsiStrategy::load(CFR_GSI_DATA_DIR);
-    INFO("GSI equilibrium data absent; run `make data/gsi/partition`");
-    REQUIRE(strategy.available());
-
-    for (int rank = 0; rank < cfr::kRankCount; ++rank) {
-        std::vector<double> probabilities =
-            strategy.action_probabilities(facing_opening_raise(rank, 0));
-        REQUIRE(probabilities.size() == 3);
-        REQUIRE_THAT(probabilities[0],
-                     WithinAbs(kGilpinSandholmRound1FoldFrequency[rank], 1e-6));
-    }
-}
-
-TEST_CASE("gsi round-one strategy is suit invariant") {
+TEST_CASE("gsi round-one folds match the paper and ignore suit") {
     GsiStrategy strategy = GsiStrategy::load(CFR_GSI_DATA_DIR);
     INFO("GSI equilibrium data absent; run `make data/gsi/partition`");
     REQUIRE(strategy.available());
@@ -61,13 +46,15 @@ TEST_CASE("gsi round-one strategy is suit invariant") {
     for (int rank = 0; rank < cfr::kRankCount; ++rank) {
         std::vector<double> clubs =
             strategy.action_probabilities(facing_opening_raise(rank, 0));
+        REQUIRE(clubs.size() == 3);
+        REQUIRE_THAT(clubs[0],
+                     WithinAbs(kGilpinSandholmRound1FoldFrequency[rank], 1e-6));
         for (int suit = 1; suit < cfr::kSuitCount; ++suit) {
             std::vector<double> other =
                 strategy.action_probabilities(facing_opening_raise(rank, suit));
             REQUIRE(other.size() == clubs.size());
-            for (std::size_t i = 0; i < clubs.size(); ++i) {
+            for (std::size_t i = 0; i < clubs.size(); ++i)
                 REQUIRE_THAT(other[i], WithinAbs(clubs[i], 1e-12));
-            }
         }
     }
 }

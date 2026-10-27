@@ -1,7 +1,5 @@
 // The Rhode Island best-response walk, checked on fold payoffs, value
-// conservation and the published equilibrium. The equilibrium tests
-// pass without checking anything when the GSI.jar data files are
-// absent.
+// conservation and the published equilibrium.
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

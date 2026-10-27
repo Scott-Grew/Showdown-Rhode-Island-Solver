@@ -1,5 +1,4 @@
-// The strategy container and the regret-matching arithmetic that both
-// solvers share.
+// Strategy profiles and the regret-matching step the product solver uses.
 
 #pragma once
 
@@ -41,43 +40,10 @@ inline void normalize_or_uniform(std::span<double> values,
     for (double& value : values) value = uniform_probability;
 }
 
-inline std::vector<double> average_from_sums(
-    std::span<const double> strategy_sum) {
-    std::vector<double> strategy(strategy_sum.begin(), strategy_sum.end());
-    normalize_or_uniform(strategy);
-    return strategy;
-}
-
-// Turns regrets into a strategy in place: negatives clamp to zero,
-// then normalize, uniform when nothing is positive.
+// Negatives clamp to zero, then normalize. Uniform when nothing is positive.
 inline void regret_matching_in_place(std::span<double> strategy) {
     for (double& value : strategy) value = std::max(value, 0.0);
     normalize_or_uniform(strategy, 0.0);
-}
-
-// Regret matching written into strategy;
-// both spans must have the same length.
-inline void regret_matching_strategy_into(
-    std::span<const double> cumulative_regrets, std::span<double> strategy) {
-    for (std::size_t i = 0; i < cumulative_regrets.size(); ++i)
-        strategy[i] = cumulative_regrets[i];
-    regret_matching_in_place(strategy);
-}
-
-inline std::vector<double> regret_matching_strategy(
-    std::span<const double> cumulative_regrets) {
-    std::vector<double> strategy(cumulative_regrets.size());
-    regret_matching_strategy_into(cumulative_regrets, strategy);
-    return strategy;
-}
-
-// CFR+ update: adds the increments and floors each regret at zero.
-inline void accumulate_regret_plus(std::span<double> cumulative_regrets,
-                                   std::span<const double> increments) {
-    for (std::size_t i = 0; i < cumulative_regrets.size(); ++i) {
-        cumulative_regrets[i] =
-            std::max(cumulative_regrets[i] + increments[i], 0.0);
-    }
 }
 
 }

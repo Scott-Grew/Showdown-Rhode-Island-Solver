@@ -1,6 +1,3 @@
-// The sampled solver: agreement with analytic Kuhn and with full-tree
-// CFR on Leduc, and the multi-thread invariants.
-
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
@@ -99,7 +96,7 @@ TEST_CASE("per-thread streams are distinct") {
     REQUIRE(seen.size() == 16);
 }
 
-TEST_CASE("load_strategy_sums rejects a suit-canonical checkpoint") {
+TEST_CASE("load_strategy_sums rejects a checkpoint of the wrong size") {
     RhodeIslandGame game;
     REQUIRE(game.infoset_count() == 3142152);
     ExternalSamplingSolver<RhodeIslandGame> solver(game, 1);
@@ -112,8 +109,11 @@ TEST_CASE("load_strategy_sums rejects a suit-canonical checkpoint") {
 
     {
         std::ofstream output(path, std::ios::binary);
-        // Previous table: 5,139,368 infosets and 3 actions each.
-        std::uint64_t value_count = 5139368ULL * 3ULL;
+        // One value short of the table load_strategy_sums requires.
+        std::uint64_t value_count =
+            static_cast<std::uint64_t>(game.infoset_count()) *
+                RhodeIslandGame::kMaxActions -
+            1;
         int iteration = 1;
         output.write(reinterpret_cast<const char*>(&value_count),
                      sizeof(value_count));

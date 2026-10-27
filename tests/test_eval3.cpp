@@ -1,5 +1,6 @@
-// The three-card evaluator against poker facts and against the naive
-// reference over all C(52,3) hands.
+// Three-card order against the poker ranking, the wheel, and the
+// naive reference over every C(52,3) hand. The same sweep checks the
+// rank table lookup_3card filled from evaluate_3card.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -23,57 +24,18 @@ using cfr::eval::naive::naive_evaluate_3card;
 using cfr::eval::naive::NaiveRank;
 
 TEST_CASE("RIH eval3 ranks categories in three-card poker order") {
-    std::array<Card, 3> straight_flush = {make_card(3, 0), make_card(4, 0),
-                                          make_card(5, 0)};
-    std::array<Card, 3> trips = {make_card(5, 0), make_card(5, 1),
-                                 make_card(5, 2)};
-    std::array<Card, 3> straight = {make_card(3, 0), make_card(4, 1),
-                                    make_card(5, 2)};
-    std::array<Card, 3> flush = {make_card(0, 0), make_card(1, 0),
-                                 make_card(3, 0)};
-    std::array<Card, 3> pair = {make_card(5, 0), make_card(5, 1),
-                                make_card(2, 2)};
-    std::array<Card, 3> high_card = {make_card(0, 0), make_card(2, 1),
-                                     make_card(5, 2)};
-
-    REQUIRE(evaluate_3card(straight_flush.data()) >
-            evaluate_3card(trips.data()));
-    REQUIRE(evaluate_3card(trips.data()) > evaluate_3card(straight.data()));
-    REQUIRE(evaluate_3card(straight.data()) > evaluate_3card(flush.data()));
-    REQUIRE(evaluate_3card(flush.data()) > evaluate_3card(pair.data()));
-    REQUIRE(evaluate_3card(pair.data()) > evaluate_3card(high_card.data()));
-
-    REQUIRE(naive_evaluate_3card(trips.data()) <
-            naive_evaluate_3card(straight_flush.data()));
-    REQUIRE(naive_evaluate_3card(straight.data()) <
-            naive_evaluate_3card(trips.data()));
-    REQUIRE(naive_evaluate_3card(flush.data()) <
-            naive_evaluate_3card(straight.data()));
-    REQUIRE(naive_evaluate_3card(pair.data()) <
-            naive_evaluate_3card(flush.data()));
-    REQUIRE(naive_evaluate_3card(high_card.data()) <
-            naive_evaluate_3card(pair.data()));
-}
-
-TEST_CASE(
-    "RIH eval3 inversions: trips beat a straight, a straight beats a flush") {
-    std::array<Card, 3> trips = {make_card(6, 0), make_card(6, 1),
-                                 make_card(6, 2)};
-    std::array<Card, 3> straight = {make_card(4, 0), make_card(5, 1),
-                                    make_card(6, 2)};
-    std::array<Card, 3> flush = {make_card(0, 3), make_card(2, 3),
-                                 make_card(7, 3)};
-
-    REQUIRE(evaluate_3card(trips.data()) > evaluate_3card(straight.data()));
-    REQUIRE(evaluate_3card(trips.data()) > evaluate_3card(flush.data()));
-    REQUIRE(evaluate_3card(straight.data()) > evaluate_3card(flush.data()));
-
-    REQUIRE(naive_evaluate_3card(straight.data()) <
-            naive_evaluate_3card(trips.data()));
-    REQUIRE(naive_evaluate_3card(flush.data()) <
-            naive_evaluate_3card(trips.data()));
-    REQUIRE(naive_evaluate_3card(flush.data()) <
-            naive_evaluate_3card(straight.data()));
+    std::array<std::array<Card, 3>, 6> hands = {{
+        {make_card(3, 0), make_card(4, 0), make_card(5, 0)},
+        {make_card(5, 0), make_card(5, 1), make_card(5, 2)},
+        {make_card(3, 0), make_card(4, 1), make_card(5, 2)},
+        {make_card(0, 0), make_card(1, 0), make_card(3, 0)},
+        {make_card(5, 0), make_card(5, 1), make_card(2, 2)},
+        {make_card(0, 0), make_card(2, 1), make_card(5, 2)},
+    }};
+    for (std::size_t i = 0; i + 1 < hands.size(); ++i) {
+        REQUIRE(evaluate_3card(hands[i].data()) >
+                evaluate_3card(hands[i + 1].data()));
+    }
 }
 
 TEST_CASE("RIH eval3 wheel: A-2-3 is the lowest straight, Q-K-A the highest") {
@@ -92,10 +54,6 @@ TEST_CASE("RIH eval3 wheel: A-2-3 is the lowest straight, Q-K-A the highest") {
             evaluate_3card(two_three_four.data()));
     REQUIRE(evaluate_3card(two_three_four.data()) <
             evaluate_3card(broadway.data()));
-    REQUIRE(naive_evaluate_3card(wheel.data()) <
-            naive_evaluate_3card(two_three_four.data()));
-    REQUIRE(naive_evaluate_3card(two_three_four.data()) <
-            naive_evaluate_3card(broadway.data()));
 }
 
 TEST_CASE("RIH eval3 matches the naive reference order over all C(52,3) hands",

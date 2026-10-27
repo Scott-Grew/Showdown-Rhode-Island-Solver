@@ -23,11 +23,9 @@ struct WeightedState {
     double reach_weight;
 };
 
-// Every responder state of each infoset.
 using StatesByInfoset =
     std::map<game::InfosetLabel, std::vector<WeightedState>>;
 
-// Best-response value already computed per infoset.
 using BestResponseMemo = std::map<game::InfosetLabel, double>;
 
 // The opponent's strategy at state, or uniform when the profile
@@ -92,8 +90,6 @@ void collect_responder_states(const GameT& game, const game::State& state,
     }
 }
 
-// Declared early because it and
-// best_response_value_at call each other.
 template <typename GameT>
 double node_value(const GameT& game, const game::State& state,
                   const StrategyProfile& opponent_strategy,
@@ -139,8 +135,6 @@ double best_response_value_at(const GameT& game,
     return normalized_best_value;
 }
 
-// Expected responder value below state when the responder plays a
-// best response and the opponent follows the profile.
 template <typename GameT>
 double node_value(const GameT& game, const game::State& state,
                   const StrategyProfile& opponent_strategy,

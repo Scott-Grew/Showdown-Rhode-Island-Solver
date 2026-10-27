@@ -28,28 +28,16 @@ class KuhnGame {
 public:
     static constexpr std::size_t kMaxActions = 2;
 
-    // The empty state, before any card is dealt.
     State initial_state() const;
-    // True once the hand is over, by a fold or a showdown.
     bool is_terminal(const State& state) const;
-    // True while a card is due to be dealt.
     bool is_chance(const State& state) const;
-    // Player to act at a decision node.
     Player current_player(const State& state) const;
-    // Legal actions at a decision node, in table column order.
     FixedVector<Action, kMaxActions> legal_actions(const State& state) const;
-    // Returns the state after a betting action or a dealt card.
     State apply_action(const State& state, Action action) const;
-    // Chips won by player at a terminal state; the game is zero-sum.
     double terminal_utility(const State& state, Player player) const;
-    // Text label of what the acting player
-    // knows: cards seen and betting.
     InfosetLabel infoset_label(const State& state) const;
-    // Number of infosets, the row count of a solver table.
     std::uint32_t infoset_count() const;
-    // Dense row of the acting player's infoset, below infoset_count.
     std::uint32_t infoset_index(const State& state) const;
-    // Each possible deal at a chance node with its probability.
     FixedVector<ChanceOutcome, kMaxChanceOutcomes> chance_outcomes(
         const State& state) const;
 
@@ -57,17 +45,16 @@ private:
     // One full Kuhn hand ends in at most three betting actions.
     static constexpr std::size_t kMaxBettingActions = 3;
 
-    // The history without its two leading card entries.
     static FixedVector<Action, kMaxBettingActions> betting_history(
         const State& state);
-
-    // Chips won by player 0 at a terminal state.
     static double player0_utility(const State& state);
 
-    // Decision point reached by the betting: 0 opening, 1 after a
-    // check, 2 after a bet, 3 after check then bet.
+    // 0 opening, 1 after a check, 2 after a bet, 3 after check-bet.
     static int betting_progress(
         const FixedVector<Action, kMaxBettingActions>& betting);
 };
+
+static_assert(GameLike<KuhnGame>);
+static_assert(LabelledGame<KuhnGame>);
 
 }

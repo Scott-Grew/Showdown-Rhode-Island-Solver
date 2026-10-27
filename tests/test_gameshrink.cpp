@@ -56,11 +56,15 @@ void check(const GsiStrategy& strategy, std::size_t round) {
 
 }
 
-TEST_CASE("gameshrink class counts match the published partition counts") {
-    const RihPartition part = RihPartition::compute();
-    REQUIRE(part.class_count(0) == 13);
-    REQUIRE(part.class_count(1) == 205);
-    REQUIRE(part.class_count(2) == 1774);
+TEST_CASE("partition class counts match the published integers") {
+    const RihPartition authors = RihPartition::compute();
+    const RihPartition refined = authors.refined();
+    REQUIRE(authors.class_count(0) == 13);
+    REQUIRE(authors.class_count(1) == 205);
+    REQUIRE(authors.class_count(2) == 1774);
+    REQUIRE(refined.class_count(0) == 13);
+    REQUIRE(refined.class_count(1) == 325);
+    REQUIRE(refined.class_count(2) == 7969);
 }
 
 TEST_CASE("gameshrink partition is equivalent to the published partition") {
@@ -103,13 +107,6 @@ std::uint8_t showdown(int hole, int opponent, int flop, int turn) {
     return 1;
 }
 
-}
-
-TEST_CASE("refined partition class counts are the lossless fixed point") {
-    const RihPartition part = RihPartition::compute().refined();
-    REQUIRE(part.class_count(0) == 13);
-    REQUIRE(part.class_count(1) == 325);
-    REQUIRE(part.class_count(2) == 7969);
 }
 
 TEST_CASE("refined partition refines gameshrink and respects suits") {

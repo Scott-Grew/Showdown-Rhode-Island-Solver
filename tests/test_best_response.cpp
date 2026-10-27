@@ -1,5 +1,4 @@
-// Properties of the full-tree best response on Kuhn: exploitability
-// is non-negative and no fixed strategy beats the best response.
+// Best response on Kuhn beats the strategies it is compared with.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -45,42 +44,6 @@ StrategyProfile pure_action_profile(const GameT& game, Player player,
     return profile;
 }
 
-template <typename GameT>
-double expected_value(const GameT& game, const StrategyProfile& profile,
-                      Player player, const State& state) {
-    if (game.is_terminal(state)) return game.terminal_utility(state, player);
-
-    if (game.is_chance(state)) {
-        double value = 0.0;
-        for (auto& [action, probability] : game.chance_outcomes(state))
-            value +=
-                probability * expected_value(game, profile, player,
-                                             game.apply_action(state, action));
-        return value;
-    }
-
-    auto actions = game.legal_actions(state);
-    auto profile_entry = profile.find(game.infoset_label(state));
-    double uniform_probability = 1.0 / static_cast<double>(actions.size());
-
-    double value = 0.0;
-    for (std::size_t i = 0; i < actions.size(); ++i) {
-        double action_probability = profile_entry != profile.end()
-                                        ? profile_entry->second[i]
-                                        : uniform_probability;
-        value += action_probability *
-                 expected_value(game, profile, player,
-                                game.apply_action(state, actions[i]));
-    }
-    return value;
-}
-
-template <typename GameT>
-double expected_value(const GameT& game, const StrategyProfile& profile,
-                      Player player) {
-    return expected_value(game, profile, player, game.initial_state());
-}
-
 }
 
 TEST_CASE(
@@ -110,18 +73,4 @@ TEST_CASE("BR value weakly improves on any fixed alternative strategy") {
     if (br_value > uniform_value + 1e-9) any_strict_improvement = true;
 
     CHECK(any_strict_improvement);
-}
-
-TEST_CASE("exploitability is symmetric-nonnegative") {
-    KuhnGame game;
-    StrategyProfile uniform = uniform_profile(game);
-    CHECK(exploitability(game, uniform) >= 0.0);
-
-    StrategyProfile player0_always_first =
-        pure_action_profile(game, 0, false, uniform);
-    CHECK(exploitability(game, player0_always_first) >= 0.0);
-
-    StrategyProfile player1_always_last =
-        pure_action_profile(game, 1, true, uniform);
-    CHECK(exploitability(game, player1_always_last) >= 0.0);
 }

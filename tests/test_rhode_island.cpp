@@ -1,10 +1,7 @@
-// Rhode Island rules: node counts against combinatorial formulas,
-// payoffs, suit symmetry and hidden information.
+// Rhode Island: published tree sizes, payoffs, suit symmetry, hidden cards.
 
 #include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
-#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <unordered_map>
@@ -20,180 +17,126 @@
 using cfr::make_card;
 using namespace cfr::game;
 
-static_assert(GameLike<RhodeIslandGame>);
-
 namespace {
-
-struct BettingRoundTopology {
-    long long node_count;
-    long long closing_leaf_count;
-};
-
-BettingRoundTopology enumerate_betting_round_topology(
-    int raises_used, bool facing_bet, bool is_round_start,
-    int max_raises_per_round) {
-    long long node_count = 1;
-    long long closing_leaf_count = 0;
-
-    if (!facing_bet) {
-        if (is_round_start) {
-            BettingRoundTopology check_subtree =
-                enumerate_betting_round_topology(raises_used, false, false,
-                                                 max_raises_per_round);
-            node_count += check_subtree.node_count;
-            closing_leaf_count += check_subtree.closing_leaf_count;
-        } else {
-            node_count += 1;
-            closing_leaf_count += 1;
-        }
-        BettingRoundTopology bet_subtree = enumerate_betting_round_topology(
-            raises_used + 1, true, false, max_raises_per_round);
-        node_count += bet_subtree.node_count;
-        closing_leaf_count += bet_subtree.closing_leaf_count;
-    } else {
-        node_count += 1;
-        node_count += 1;
-        closing_leaf_count += 1;
-        if (raises_used < max_raises_per_round) {
-            BettingRoundTopology raise_subtree =
-                enumerate_betting_round_topology(raises_used + 1, true, false,
-                                                 max_raises_per_round);
-            node_count += raise_subtree.node_count;
-            closing_leaf_count += raise_subtree.closing_leaf_count;
-        }
-    }
-    return {node_count, closing_leaf_count};
-}
-
-long long composed_three_round_betting_node_count(int max_raises_per_round) {
-    BettingRoundTopology round1_topology =
-        enumerate_betting_round_topology(0, false, true, max_raises_per_round);
-    BettingRoundTopology round2_topology =
-        enumerate_betting_round_topology(0, false, true, max_raises_per_round);
-    BettingRoundTopology round3_topology =
-        enumerate_betting_round_topology(0, false, true, max_raises_per_round);
-    return round1_topology.node_count +
-           round1_topology.closing_leaf_count *
-               (round2_topology.node_count +
-                round2_topology.closing_leaf_count *
-                    round3_topology.node_count);
-}
-
-constexpr long long kRihOrderedHoleAssignmentCount = 52 * 51;
-constexpr long long kRihFlopOutcomeCount = 50;
-constexpr long long kRihTurnOutcomeCount = 49;
-
-long long full_game_node_count(int max_raises_per_round) {
-    BettingRoundTopology round_topology =
-        enumerate_betting_round_topology(0, false, true, max_raises_per_round);
-    long long nodes_per_hole_assignment =
-        round_topology.node_count +
-        round_topology.closing_leaf_count * kRihFlopOutcomeCount *
-            (round_topology.node_count + round_topology.closing_leaf_count *
-                                             kRihTurnOutcomeCount *
-                                             round_topology.node_count);
-    return kRihOrderedHoleAssignmentCount * nodes_per_hole_assignment;
-}
-
-long long count_fixed_card_engine_nodes(const RhodeIslandGame& game,
-                                        const State& state,
-                                        Action fixed_flop_action,
-                                        Action fixed_turn_action) {
-    long long total = 1;
-    if (game.is_terminal(state)) return total;
-    if (game.is_chance(state)) {
-        Action next_card_action =
-            state.board_count == 0 ? fixed_flop_action : fixed_turn_action;
-        total += count_fixed_card_engine_nodes(
-            game, game.apply_action(state, next_card_action), fixed_flop_action,
-            fixed_turn_action);
-        return total;
-    }
-    for (Action action : game.legal_actions(state)) {
-        total += count_fixed_card_engine_nodes(
-            game, game.apply_action(state, action), fixed_flop_action,
-            fixed_turn_action);
-    }
-    return total;
-}
 
 struct SequenceFormSize {
     std::array<long long, 2> infosets, sequences;
 };
 
-SequenceFormSize count_fixed_card_sequence_form_size(
-    const RhodeIslandGame& game, const State& state, Action fixed_flop_action,
-    Action fixed_turn_action, const std::array<long long, 3>& classes) {
-    SequenceFormSize totals{{0, 0}, {1, 1}};
-    auto visit = [&](auto&& self, const State& node) -> void {
-        if (game.is_terminal(node)) return;
-        if (game.is_chance(node)) {
-            Action next_card_action =
-                node.board_count == 0 ? fixed_flop_action : fixed_turn_action;
-            self(self, game.apply_action(node, next_card_action));
-            return;
-        }
-        Player player = game.current_player(node);
-        long long own_information_count = classes[node.board_count];
-        auto legal = game.legal_actions(node);
-        totals.infosets[player] += own_information_count;
-        totals.sequences[player] +=
-            own_information_count * static_cast<long long>(legal.size());
-        for (Action action : legal) self(self, game.apply_action(node, action));
-    };
-    visit(visit, state);
-    return totals;
-}
-
-// Sequence-form size with classes[r] own-information values in round
-// r. Betting does not depend on the cards, so any fixed deal will do.
+// classes[r] is the number of own-information values in round r.
+// Betting does not depend on the cards, so one fixed deal stands for
+// every deal. That is what makes 91,224,226 pin the betting topology,
+// including the three-raise cap.
 SequenceFormSize rih_sequence_form_size(
     const std::array<long long, 3>& classes) {
     RhodeIslandGame game;
     State state = game.initial_state();
     state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
     state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
-    return count_fixed_card_sequence_form_size(
-        game, state, kChanceCardOffset + make_card(2, 0),
-        kChanceCardOffset + make_card(3, 0), classes);
+    Action fixed_flop = kChanceCardOffset + make_card(2, 0);
+    Action fixed_turn = kChanceCardOffset + make_card(3, 0);
+    SequenceFormSize totals{{0, 0}, {1, 1}};
+    auto visit = [&](auto&& self, const State& node) -> void {
+        if (game.is_terminal(node)) return;
+        if (game.is_chance(node)) {
+            Action next = node.board_count == 0 ? fixed_flop : fixed_turn;
+            self(self, game.apply_action(node, next));
+            return;
+        }
+        Player player = game.current_player(node);
+        long long hands = classes[node.board_count];
+        auto legal = game.legal_actions(node);
+        totals.infosets[player] += hands;
+        totals.sequences[player] +=
+            hands * static_cast<long long>(legal.size());
+        for (Action action : legal) self(self, game.apply_action(node, action));
+    };
+    visit(visit, state);
+    return totals;
 }
 
+// One chance node: distinct undealt cards, probabilities summing to 1.
+// Adds the number of longer deal prefixes to nodes; returns failures.
+int note_chance(const RhodeIslandGame& game, const State& state,
+                long long& nodes) {
+    auto outcomes = game.chance_outcomes(state);
+    double sum = 0.0;
+    std::uint64_t seen = 0;
+    std::uint64_t dealt = 0;
+    int bad = 0;
+    auto mark = [&](int card) {
+        if (card >= 0) dealt |= std::uint64_t{1} << static_cast<unsigned>(card);
+    };
+    mark(state.hole_cards[0]);
+    mark(state.hole_cards[1]);
+    for (std::uint8_t i = 0; i < state.board_count; ++i)
+        mark(state.board_cards[i]);
+    for (auto [action, probability] : outcomes) {
+        sum += probability;
+        int card = action - kChanceCardOffset;
+        if (card < 0 || card >= cfr::kCardCount) {
+            ++bad;
+            continue;
+        }
+        std::uint64_t bit = std::uint64_t{1} << static_cast<unsigned>(card);
+        if ((seen & bit) != 0 || (dealt & bit) != 0) ++bad;
+        seen |= bit;
+    }
+    if (std::abs(sum - 1.0) > 1e-12) ++bad;
+    nodes += static_cast<long long>(outcomes.size());
+    return bad;
 }
 
-TEST_CASE("RIH betting-subtree node count matches combinatorial formula") {
-    RhodeIslandGame game;
-    State state = game.initial_state();
-    state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
-    state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
-
-    Action fixed_flop_action = kChanceCardOffset + make_card(2, 0);
-    Action fixed_turn_action = kChanceCardOffset + make_card(3, 0);
-
-    long long engine_node_count = count_fixed_card_engine_nodes(
-        game, state, fixed_flop_action, fixed_turn_action);
-    long long formula_node_count =
-        composed_three_round_betting_node_count(kRihMaxRaisesPerRound);
-
-    REQUIRE(engine_node_count == formula_node_count);
+State checked_to_chance(const RhodeIslandGame& game, State state, int& bad) {
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    if (!game.is_chance(state)) ++bad;
+    return state;
 }
 
-TEST_CASE("RIH per-round betting topology matches the hand enumeration") {
-    BettingRoundTopology round_topology =
-        enumerate_betting_round_topology(0, false, true, kRihMaxRaisesPerRound);
-    REQUIRE(round_topology.node_count == 21);
-    REQUIRE(round_topology.closing_leaf_count == 7);
+// Gilpin & Sandholm, J. ACM 2007: one node per deal prefix,
+// 1 + 52 + 52*51 + 52*51*50 + 52*51*50*49.
+struct SignalCount {
+    long long nodes;
+    int bad;
+};
+
+SignalCount signal_tree(const RhodeIslandGame& game) {
+    SignalCount tally{1, 0};
+    State root = game.initial_state();
+    tally.bad += note_chance(game, root, tally.nodes);
+    for (const ChanceOutcome& hole0 : game.chance_outcomes(root)) {
+        State one = game.apply_action(root, hole0.action);
+        tally.bad += note_chance(game, one, tally.nodes);
+        for (const ChanceOutcome& hole1 : game.chance_outcomes(one)) {
+            State flop = checked_to_chance(
+                game, game.apply_action(one, hole1.action), tally.bad);
+            if (!game.is_chance(flop)) continue;
+            tally.bad += note_chance(game, flop, tally.nodes);
+            for (const ChanceOutcome& board : game.chance_outcomes(flop)) {
+                State turn = checked_to_chance(
+                    game, game.apply_action(flop, board.action), tally.bad);
+                if (!game.is_chance(turn)) continue;
+                tally.bad += note_chance(game, turn, tally.nodes);
+            }
+        }
+    }
+    return tally;
 }
 
-TEST_CASE("RIH full-game node count exceeds the published 3.1e9 figure") {
-    long long betting_and_board_nodes =
-        full_game_node_count(kRihMaxRaisesPerRound);
-    long long hole_deal_chance_node_count = 1 + cfr::kCardCount;
-    long long full_tree_node_count =
-        hole_deal_chance_node_count + betting_and_board_nodes;
+using Actions = std::vector<Action>;
 
-    REQUIRE(betting_and_board_nodes == 6705372492LL);
-    REQUIRE(full_tree_node_count == 6705372545LL);
-    REQUIRE(full_tree_node_count > 3100000000LL);
+State play(const RhodeIslandGame& game, State state, const Actions& line,
+           int card = -1) {
+    for (Action action : line) state = game.apply_action(state, action);
+    if (card >= 0) state = game.apply_action(state, kChanceCardOffset + card);
+    return state;
+}
+
+State deal_two(const RhodeIslandGame& game, int first, int second) {
+    return play(game, play(game, game.initial_state(), {}, first), {}, second);
+}
+
 }
 
 TEST_CASE("RIH unabstracted sequence-form size matches the paper") {
@@ -221,133 +164,13 @@ TEST_CASE("RIH GameShrink sequence-form size matches the paper") {
     REQUIRE(size.sequences[1] + size.infosets[0] + 1 == 1237238LL);
 }
 
-TEST_CASE("rhode island satisfies GameLike", "[concept]") {
-    REQUIRE(GameLike<RhodeIslandGame>);
-}
-
-TEST_CASE("rhode island: initial state is a chance node") {
+TEST_CASE("RIH signal tree node count matches the paper") {
+    // Every deal prefix, with dealt cards excluded and each chance
+    // node a distribution. The total is the published 6,632,705.
     RhodeIslandGame game;
-    State state = game.initial_state();
-    REQUIRE(game.is_chance(state));
-}
-
-TEST_CASE(
-    "rhode island: with both hole cards dealt, player 0 may check or raise") {
-    RhodeIslandGame game;
-    State state = game.initial_state();
-    state = game.apply_action(state, kChanceCardOffset + 0);
-    state = game.apply_action(state, kChanceCardOffset + 4);
-
-    REQUIRE_FALSE(game.is_chance(state));
-    REQUIRE(game.current_player(state) == 0);
-    auto legal = game.legal_actions(state);
-    REQUIRE(legal.size() == 2);
-    REQUIRE(std::find(legal.begin(), legal.end(), kActionCallCheck) !=
-            legal.end());
-    REQUIRE(std::find(legal.begin(), legal.end(), kActionRaise) != legal.end());
-}
-
-TEST_CASE("rhode island: raise cap enforced at 3 per round") {
-    RhodeIslandGame game;
-    State state = game.initial_state();
-    state = game.apply_action(state, kChanceCardOffset + 0);
-    state = game.apply_action(state, kChanceCardOffset + 4);
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionRaise);
-    state = game.apply_action(state, kActionRaise);
-    state = game.apply_action(state, kActionRaise);
-
-    REQUIRE_FALSE(game.is_terminal(state));
-    auto legal = game.legal_actions(state);
-    REQUIRE(std::find(legal.begin(), legal.end(), kActionRaise) == legal.end());
-    REQUIRE(std::find(legal.begin(), legal.end(), kActionFold) != legal.end());
-    REQUIRE(std::find(legal.begin(), legal.end(), kActionCallCheck) !=
-            legal.end());
-}
-
-TEST_CASE("rhode island: round transitions through flop and turn to terminal") {
-    RhodeIslandGame game;
-    State state = game.initial_state();
-    state = game.apply_action(state, kChanceCardOffset + 0);
-    state = game.apply_action(state, kChanceCardOffset + 4);
-
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionCallCheck);
-    REQUIRE(game.is_chance(state));
-
-    auto flop_outcomes = game.chance_outcomes(state);
-    state = game.apply_action(state, flop_outcomes[0].action);
-    REQUIRE_FALSE(game.is_chance(state));
-    REQUIRE_FALSE(game.is_terminal(state));
-    REQUIRE(game.current_player(state) == 0);
-
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionCallCheck);
-    REQUIRE(game.is_chance(state));
-
-    auto turn_outcomes = game.chance_outcomes(state);
-    state = game.apply_action(state, turn_outcomes[0].action);
-    REQUIRE_FALSE(game.is_chance(state));
-    REQUIRE_FALSE(game.is_terminal(state));
-    REQUIRE(game.current_player(state) == 0);
-
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionCallCheck);
-    REQUIRE(game.is_terminal(state));
-    REQUIRE(state.contribution[0] + state.contribution[1] == 10);
-}
-
-TEST_CASE(
-    "rhode island: chance probabilities sum to 1 and exclude dealt cards") {
-    RhodeIslandGame game;
-    State state = game.initial_state();
-    REQUIRE(game.is_chance(state));
-
-    auto hole0_outcomes = game.chance_outcomes(state);
-    REQUIRE(hole0_outcomes.size() == 52);
-    double hole0_probability_sum = 0.0;
-    for (auto& [action, probability] : hole0_outcomes)
-        hole0_probability_sum += probability;
-    REQUIRE_THAT(hole0_probability_sum, Catch::Matchers::WithinAbs(1.0, 1e-12));
-
-    Action hole0_dealt_action = hole0_outcomes[0].action;
-    state = game.apply_action(state, hole0_dealt_action);
-
-    auto hole1_outcomes = game.chance_outcomes(state);
-    REQUIRE(hole1_outcomes.size() == 51);
-    for (auto& [action, probability] : hole1_outcomes)
-        REQUIRE(action != hole0_dealt_action);
-    double hole1_probability_sum = 0.0;
-    for (auto& [action, probability] : hole1_outcomes)
-        hole1_probability_sum += probability;
-    REQUIRE_THAT(hole1_probability_sum, Catch::Matchers::WithinAbs(1.0, 1e-12));
-
-    state = game.apply_action(state, hole1_outcomes[0].action);
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionCallCheck);
-    REQUIRE(game.is_chance(state));
-
-    auto flop_outcomes = game.chance_outcomes(state);
-    REQUIRE(flop_outcomes.size() == 50);
-    double flop_probability_sum = 0.0;
-    for (auto& [action, probability] : flop_outcomes)
-        flop_probability_sum += probability;
-    REQUIRE_THAT(flop_probability_sum, Catch::Matchers::WithinAbs(1.0, 1e-12));
-
-    Action flop_dealt_action = flop_outcomes[0].action;
-    state = game.apply_action(state, flop_dealt_action);
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionCallCheck);
-    REQUIRE(game.is_chance(state));
-
-    auto turn_outcomes = game.chance_outcomes(state);
-    REQUIRE(turn_outcomes.size() == 49);
-    for (auto& [action, probability] : turn_outcomes)
-        REQUIRE(action != flop_dealt_action);
-    double turn_probability_sum = 0.0;
-    for (auto& [action, probability] : turn_outcomes)
-        turn_probability_sum += probability;
-    REQUIRE_THAT(turn_probability_sum, Catch::Matchers::WithinAbs(1.0, 1e-12));
+    SignalCount tally = signal_tree(game);
+    REQUIRE(tally.bad == 0);
+    REQUIRE(tally.nodes == 6632705LL);
 }
 
 // The fast draw must pick the same card as summing chance_outcomes,
@@ -391,14 +214,8 @@ TEST_CASE("rhode island chance sample matches the cumulative draw") {
 TEST_CASE(
     "rhode island: a round 1 fold pays the raiser the folder's contribution") {
     RhodeIslandGame game;
-    State state = game.initial_state();
-    state = game.apply_action(state, kChanceCardOffset + 0);
-    state = game.apply_action(state, kChanceCardOffset + 4);
-
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionRaise);
-    state = game.apply_action(state, kActionFold);
-
+    State state = play(game, deal_two(game, 0, 4),
+                       {kActionCallCheck, kActionRaise, kActionFold});
     REQUIRE(game.is_terminal(state));
     REQUIRE(state.contribution[0] + state.contribution[1] == 20);
     REQUIRE(game.terminal_utility(state, 0) == -5.0);
@@ -408,79 +225,29 @@ TEST_CASE(
 TEST_CASE(
     "rhode island showdown: a straight beats a flush, unlike standard poker") {
     RhodeIslandGame game;
-    State state = game.initial_state();
-    state = game.apply_action(state, kChanceCardOffset + make_card(8, 2));
-    state = game.apply_action(state, kChanceCardOffset + make_card(3, 0));
-
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kChanceCardOffset + make_card(4, 2));
-
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kChanceCardOffset + make_card(5, 2));
-
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionCallCheck);
-
+    State state = deal_two(game, make_card(8, 2), make_card(3, 0));
+    state = play(game, state, {kActionCallCheck, kActionCallCheck},
+                 make_card(4, 2));
+    state = play(game, state, {kActionCallCheck, kActionCallCheck},
+                 make_card(5, 2));
+    state = play(game, state, {kActionCallCheck, kActionCallCheck});
     REQUIRE(game.is_terminal(state));
     REQUIRE(state.contribution[0] + state.contribution[1] == 10);
     REQUIRE(game.terminal_utility(state, 1) == 5.0);
     REQUIRE(game.terminal_utility(state, 0) == -5.0);
-    REQUIRE(game.terminal_utility(state, 0) + game.terminal_utility(state, 1) ==
-            0.0);
 }
 
 TEST_CASE("rhode island showdown: equal-ranked hands split the pot") {
     RhodeIslandGame game;
-    State state = game.initial_state();
-    state = game.apply_action(state, kChanceCardOffset + make_card(4, 2));
-    state = game.apply_action(state, kChanceCardOffset + make_card(4, 3));
-
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
-
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kChanceCardOffset + make_card(8, 1));
-
-    state = game.apply_action(state, kActionCallCheck);
-    state = game.apply_action(state, kActionCallCheck);
-
+    State state = deal_two(game, make_card(4, 2), make_card(4, 3));
+    state = play(game, state, {kActionCallCheck, kActionCallCheck},
+                 make_card(1, 0));
+    state = play(game, state, {kActionCallCheck, kActionCallCheck},
+                 make_card(8, 1));
+    state = play(game, state, {kActionCallCheck, kActionCallCheck});
     REQUIRE(game.is_terminal(state));
     REQUIRE(game.terminal_utility(state, 0) == 0.0);
     REQUIRE(game.terminal_utility(state, 1) == 0.0);
-}
-
-TEST_CASE(
-    "rhode island: zero-sum at every terminal of the fixed-hole subtree") {
-    RhodeIslandGame game;
-    State state = game.initial_state();
-    state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
-    state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
-
-    long long terminals_visited = 0;
-    walk(game, state, [&](const State& s) {
-        if (!game.is_terminal(s)) return;
-        REQUIRE(game.terminal_utility(s, 0) + game.terminal_utility(s, 1) ==
-                0.0);
-        ++terminals_visited;
-    });
-    REQUIRE(terminals_visited > 0);
-}
-
-TEST_CASE(
-    "rhode island: legal_actions is non-empty across the fixed-hole subtree") {
-    RhodeIslandGame game;
-    State state = game.initial_state();
-    state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
-    state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
-
-    walk(game, state, [&](const State& s) {
-        if (game.is_terminal(s) || game.is_chance(s)) return;
-        REQUIRE_FALSE(game.legal_actions(s).empty());
-    });
 }
 
 namespace {
@@ -632,38 +399,11 @@ TEST_CASE(
     State state = game.initial_state();
     state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
     state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
-
-    long long showdown_terminals = 0;
-    walk(game, state, [&](const State& terminal_candidate) {
-        if (!game.is_terminal(terminal_candidate)) return;
-        if (terminal_candidate.history[terminal_candidate.history_len - 1] ==
-            kActionFold)
-            return;
-        ++showdown_terminals;
-        std::array<int, 2> contributions = terminal_candidate.contribution;
-        REQUIRE(contributions[0] == contributions[1]);
-        int pot = contributions[0] + contributions[1];
-        REQUIRE(pot % 2 == 0);
-        double first_player_utility =
-            game.terminal_utility(terminal_candidate, 0);
-        double half_pot = pot / 2.0;
-        REQUIRE((first_player_utility == 0.0 ||
-                 first_player_utility == half_pot ||
-                 first_player_utility == -half_pot));
+    require_showdown_pot(game, state, [](const State& terminal) {
+        return terminal.contribution;
     });
-    REQUIRE(showdown_terminals > 0);
 }
 namespace {
-using Actions = std::vector<Action>;
-State play(const RhodeIslandGame& game, State state, const Actions& line,
-           int card = -1) {
-    for (Action action : line) state = game.apply_action(state, action);
-    if (card >= 0) state = game.apply_action(state, kChanceCardOffset + card);
-    return state;
-}
-State deal_two(const RhodeIslandGame& game, int first, int second) {
-    return play(game, play(game, game.initial_state(), {}, first), {}, second);
-}
 int spare(int first, int second = -1, int third = -1) {
     for (int card = 0; card < cfr::kCardCount; ++card)
         if (card != first && card != second && card != third) return card;

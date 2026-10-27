@@ -1,118 +1,63 @@
-// Kuhn rules: zero-sum payoffs, infoset count, hidden opponent card
-// and legal actions.
+// Kuhn: 12 infosets, hidden cards, and the analytic chip payoffs.
+// Decision nodes of Leduc and Rhode Island are checked here too.
 
 #include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
-#include <cstdint>
-#include <map>
-#include <set>
-#include <tuple>
-#include <vector>
-
+#include "game/card.hpp"
+#include "game/rhode_island.hpp"
 #include "oracles/kuhn.hpp"
+#include "oracles/leduc.hpp"
 #include "tree_walk.hpp"
 
 using namespace cfr::game;
 
-TEST_CASE("kuhn zero-sum at every terminal") {
-    KuhnGame game;
-    walk(game, game.initial_state(), [&](const State& s) {
-        if (!game.is_terminal(s)) return;
-        REQUIRE(game.terminal_utility(s, 0) + game.terminal_utility(s, 1) ==
-                0.0);
-    });
+TEST_CASE("decision nodes have a legal action") {
+    KuhnGame kuhn;
+    require_decisions_actionable(kuhn, kuhn.initial_state());
+    LeducGame leduc;
+    require_decisions_actionable(leduc, leduc.initial_state());
+
+    // One fixed deal. Betting does not depend on the cards, which is
+    // why the sequence-form integer 91,224,226 pins that topology.
+    RhodeIslandGame rhode;
+    State dealt = rhode.initial_state();
+    dealt = rhode.apply_action(dealt, kChanceCardOffset + cfr::make_card(0, 0));
+    dealt = rhode.apply_action(dealt, kChanceCardOffset + cfr::make_card(1, 0));
+    require_decisions_actionable(rhode, dealt);
 }
 
-TEST_CASE("kuhn exactly 12 infosets") {
+TEST_CASE("kuhn infoset index is a bijection onto 12 rows") {
     KuhnGame game;
-    std::set<InfosetLabel> keys;
-    walk(game, game.initial_state(), [&](const State& s) {
-        if (!game.is_terminal(s) && !game.is_chance(s))
-            keys.insert(game.infoset_label(s));
-    });
-    REQUIRE(keys.size() == 12);
-}
-
-TEST_CASE("kuhn infoset label hides opponent card") {
-    KuhnGame game;
-    std::map<std::tuple<Player, int, std::vector<int>>, std::set<InfosetLabel>>
-        keys_by_group;
-
-    walk(game, game.initial_state(), [&](const State& s) {
-        if (game.is_terminal(s) || game.is_chance(s)) return;
-        Player player = game.current_player(s);
-        int own_card = s.hole_cards[player];
-        std::vector<int> betting;
-        for (std::uint8_t index = 2; index < s.history_len; ++index)
-            betting.push_back(s.history[index]);
-        keys_by_group[{player, own_card, betting}].insert(
-            game.infoset_label(s));
-    });
-
-    for (auto& [group, keys] : keys_by_group) {
-        REQUIRE(keys.size() == 1);
-    }
-}
-
-TEST_CASE(
-    "kuhn legal_actions non-empty at every non-terminal, non-chance state") {
-    KuhnGame game;
-    walk(game, game.initial_state(), [&](const State& s) {
-        if (game.is_terminal(s) || game.is_chance(s)) return;
-        REQUIRE_FALSE(game.legal_actions(s).empty());
-    });
+    REQUIRE(require_infoset_bijection(game) == 12);
 }
 
 TEST_CASE("kuhn chance outcome probabilities sum to 1") {
     KuhnGame game;
-    walk(game, game.initial_state(), [&](const State& s) {
-        if (!game.is_chance(s)) return;
-        double probability_sum = 0.0;
-        for (auto& [action, probability] : game.chance_outcomes(s)) {
-            probability_sum += probability;
-        }
-        REQUIRE_THAT(probability_sum, Catch::Matchers::WithinAbs(1.0, 1e-12));
-    });
+    require_chance_distribution(game);
 }
 
-TEST_CASE("kuhn infoset index is a bijection onto 0 up to infoset_count") {
+TEST_CASE("kuhn showdown and fold pay the analytic amounts") {
+    struct Line {
+        int first;
+        int second;
+        Action bet;
+        Action answer;
+        double utility0;
+    };
+    // J bets into K and calls: the caller loses the 2-chip pot.
+    // A bet that folds wins the 1-chip ante.
+    Line lines[] = {
+        {kKuhnJack, kKuhnKing, kKuhnActionBet, kKuhnActionCall, -2.0},
+        {kKuhnQueen, kKuhnKing, kKuhnActionBet, kKuhnActionFold, 1.0},
+    };
     KuhnGame game;
-    std::map<InfosetLabel, std::uint32_t> index_by_label;
-    std::set<std::uint32_t> distinct_indices;
-    walk(game, game.initial_state(), [&](const State& s) {
-        if (game.is_terminal(s) || game.is_chance(s)) return;
-        InfosetLabel label = game.infoset_label(s);
-        std::uint32_t index = game.infoset_index(s);
-        REQUIRE(index < game.infoset_count());
-        auto existing = index_by_label.emplace(label, index).first;
-        REQUIRE(existing->second == index);
-        distinct_indices.insert(index);
-    });
-    REQUIRE(index_by_label.size() == distinct_indices.size());
-    REQUIRE(distinct_indices.size() == game.infoset_count());
-}
-
-TEST_CASE("kuhn: J bets, K calls -> J loses 2") {
-    KuhnGame game;
-    State state = game.initial_state();
-    state = game.apply_action(state, kKuhnJack);
-    state = game.apply_action(state, kKuhnKing);
-    state = game.apply_action(state, kKuhnActionBet);
-    state = game.apply_action(state, kKuhnActionCall);
-    REQUIRE(game.is_terminal(state));
-    REQUIRE(game.terminal_utility(state, 0) == -2.0);
-    REQUIRE(game.terminal_utility(state, 1) == 2.0);
-}
-
-TEST_CASE("kuhn: bet-fold pays the bettor 1") {
-    KuhnGame game;
-    State state = game.initial_state();
-    state = game.apply_action(state, kKuhnQueen);
-    state = game.apply_action(state, kKuhnKing);
-    state = game.apply_action(state, kKuhnActionBet);
-    state = game.apply_action(state, kKuhnActionFold);
-    REQUIRE(game.is_terminal(state));
-    REQUIRE(game.terminal_utility(state, 0) == 1.0);
-    REQUIRE(game.terminal_utility(state, 1) == -1.0);
+    for (const Line& line : lines) {
+        State state = game.initial_state();
+        state = game.apply_action(state, line.first);
+        state = game.apply_action(state, line.second);
+        state = game.apply_action(state, line.bet);
+        state = game.apply_action(state, line.answer);
+        REQUIRE(game.is_terminal(state));
+        REQUIRE(game.terminal_utility(state, 0) == line.utility0);
+    }
 }

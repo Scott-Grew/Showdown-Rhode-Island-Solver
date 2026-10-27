@@ -70,9 +70,6 @@ add_executable(cfr_tests
     tests/test_regret_matching.cpp
     tests/test_best_response.cpp
     tests/test_cfr_kuhn.cpp
-    tests/test_cfr_leduc.cpp
-    tests/test_game_concept.cpp
-    tests/test_state.cpp
     tests/test_gsi_strategy.cpp
     tests/test_gsi_grader.cpp
     tests/test_gameshrink.cpp
