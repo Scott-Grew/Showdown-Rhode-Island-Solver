@@ -1,7 +1,6 @@
-// Kuhn poker rules. The betting is one short sequence, so it is coded
-// directly instead of through betting_round.hpp.
+// Test oracle: Kuhn poker rules, checked for payoffs, infosets and actions.
 
-#include "game/kuhn.hpp"
+#include "oracles/kuhn.hpp"
 
 #include <cassert>
 #include <string>

@@ -9,7 +9,7 @@ GSI_JAR_URL := https://www.cs.cmu.edu/~gilpin/GSI.jar
 GSI_JAR_SHA256 := 24ab45f190cf7c54ed9bf2cbe4227e7e97ff886bed31b0cbd41df562b2737eba
 
 format-check:
-	clang-format --dry-run --Werror $$(git ls-files 'src/*.[ch]pp' 'tests/*.[ch]pp')
+	clang-format --dry-run --Werror $$(git ls-files 'src/*.[ch]pp' 'tests/*.[ch]pp' 'tests/oracles/*.[ch]pp')
 
 build:
 	cmake -B $(RELEASE_DIR) -DCMAKE_BUILD_TYPE=Release

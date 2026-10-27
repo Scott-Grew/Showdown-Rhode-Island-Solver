@@ -8,10 +8,10 @@
 #include <limits>
 #include <vector>
 
-#include "game/kuhn.hpp"
-#include "solver/best_response.hpp"
+#include "oracles/best_response.hpp"
+#include "oracles/cfr_solver.hpp"
+#include "oracles/kuhn.hpp"
 #include "solver/strategy.hpp"
-#include "solver/cfr_solver.hpp"
 
 using namespace cfr::game;
 using namespace cfr::solver;

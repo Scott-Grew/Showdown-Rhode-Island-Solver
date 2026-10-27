@@ -13,6 +13,13 @@
 
 namespace cfr::solver {
 
+namespace detail {
+
+// Size of the per-node stack buffers; solvers assert against it.
+inline constexpr std::size_t kMaxActionsPerInfoset = 64;
+
+}
+
 // Action probabilities per infoset label, in legal_actions order.
 using StrategyProfile = std::map<game::InfosetLabel, std::vector<double>>;
 

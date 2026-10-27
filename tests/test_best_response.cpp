@@ -6,8 +6,8 @@
 #include <cstddef>
 #include <vector>
 
-#include "game/kuhn.hpp"
-#include "solver/best_response.hpp"
+#include "oracles/best_response.hpp"
+#include "oracles/kuhn.hpp"
 #include "solver/strategy.hpp"
 #include "tree_walk.hpp"
 

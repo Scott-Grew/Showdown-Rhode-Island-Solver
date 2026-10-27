@@ -26,8 +26,6 @@ if(CFR_HAS_AVX2_FLAG)
 endif()
 
 add_library(cfr_game STATIC
-    src/game/kuhn.cpp
-    src/game/leduc.cpp
     src/game/rhode_island.cpp
 )
 target_include_directories(cfr_game PUBLIC ${CMAKE_SOURCE_DIR}/src)
@@ -62,6 +60,8 @@ add_executable(cfr_measure
 target_link_libraries(cfr_measure PRIVATE cfr_game cfr_eval cfr_solver cfr_grader)
 
 add_executable(cfr_tests
+    tests/oracles/kuhn.cpp
+    tests/oracles/leduc.cpp
     tests/test_card.cpp
     tests/test_kuhn.cpp
     tests/test_leduc.cpp

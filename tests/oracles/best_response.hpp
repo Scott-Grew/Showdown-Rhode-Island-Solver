@@ -1,6 +1,4 @@
-// Exact best response and exploitability by a walk of the full tree,
-// keyed by infoset label. For Kuhn and Leduc; Rhode Island uses
-// rih_best_response.hpp.
+// Test oracle: exact best response and exploitability for Kuhn and Leduc.
 
 #pragma once
 

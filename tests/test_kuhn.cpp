@@ -10,7 +10,7 @@
 #include <tuple>
 #include <vector>
 
-#include "game/kuhn.hpp"
+#include "oracles/kuhn.hpp"
 #include "tree_walk.hpp"
 
 using namespace cfr::game;

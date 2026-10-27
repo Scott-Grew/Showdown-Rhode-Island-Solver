@@ -1,7 +1,6 @@
-// Leduc rules built on betting_round.hpp, plus the dense infoset
-// index the solver tables are addressed by.
+// Test oracle: Leduc rules, checked for payoffs, infosets and the pot.
 
-#include "game/leduc.hpp"
+#include "oracles/leduc.hpp"
 
 #include <array>
 #include <cassert>

@@ -3,8 +3,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "game/game.hpp"
-#include "game/kuhn.hpp"
-#include "game/leduc.hpp"
+#include "oracles/kuhn.hpp"
+#include "oracles/leduc.hpp"
 
 #include "game/rhode_island.hpp"
 

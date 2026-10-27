@@ -11,7 +11,7 @@
 #include <tuple>
 #include <vector>
 
-#include "game/leduc.hpp"
+#include "oracles/leduc.hpp"
 #include "tree_walk.hpp"
 
 using namespace cfr::game;

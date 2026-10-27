@@ -8,21 +8,45 @@
 #include <set>
 #include <vector>
 
-#include "game/kuhn.hpp"
-#include "game/leduc.hpp"
-#include "solver/best_response.hpp"
+#include "oracles/best_response.hpp"
+#include "oracles/kuhn.hpp"
+#include "oracles/leduc.hpp"
 #include "solver/mccfr_solver.hpp"
+#include "tree_walk.hpp"
 
 using namespace cfr::game;
 using cfr::solver::exploitability;
 using cfr::solver::ExternalSamplingSolver;
+using cfr::solver::StrategyProfile;
+
+namespace {
+
+// Label-keyed average strategy. The solver stores sums by infoset
+// index; the oracle best response looks them up by label.
+template <typename GameT>
+StrategyProfile average_strategy_profile(
+    const ExternalSamplingSolver<GameT>& solver, const GameT& game) {
+    StrategyProfile profile;
+    walk(game, game.initial_state(), [&](const State& state) {
+        if (game.is_terminal(state) || game.is_chance(state)) return;
+        auto actions = game.legal_actions(state);
+        std::vector<double> strategy(actions.size());
+        solver.average_strategy_into(game.infoset_index(state), actions.size(),
+                                     strategy);
+        profile[game.infoset_label(state)] = strategy;
+    });
+    return profile;
+}
+
+}
 
 TEST_CASE("external sampling reaches the analytic kuhn game value") {
     KuhnGame game;
     ExternalSamplingSolver<KuhnGame> solver(game, 20260726);
     solver.run_iterations(200000);
 
-    REQUIRE(exploitability(game, solver.average_strategy()) < 1e-2);
+    REQUIRE(exploitability(game, average_strategy_profile(solver, game)) <
+            1e-2);
 }
 
 TEST_CASE("external sampling and vanilla cfr agree on leduc") {
@@ -30,7 +54,7 @@ TEST_CASE("external sampling and vanilla cfr agree on leduc") {
     ExternalSamplingSolver<LeducGame> solver(game, 20260726);
     solver.run_iterations(200000);
 
-    REQUIRE(exploitability(game, solver.average_strategy()) < 0.1);
+    REQUIRE(exploitability(game, average_strategy_profile(solver, game)) < 0.1);
 }
 
 TEST_CASE("strategy mass equals opponent node visits at every thread count") {

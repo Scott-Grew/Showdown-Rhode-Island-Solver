@@ -1,34 +1,32 @@
-// Leduc hold'em, the mid-sized game: small enough to walk the whole
-// tree, large enough to have two betting rounds and a board card.
+// Test oracle: Kuhn poker, whose equilibrium value is known analytically.
 
 #pragma once
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 
-#include "game/betting_round.hpp"
 #include "game/game.hpp"
 
 namespace cfr::game {
 
-// Six cards: ranks J, Q, K in two suits. Rank is card / 2.
-constexpr int kLeducDeckSize = 6;
+// Kuhn card ids, ordered by strength.
+constexpr int kKuhnJack = 0;
+constexpr int kKuhnQueen = 1;
+constexpr int kKuhnKing = 2;
+constexpr int kKuhnDeckSize = 3;
 
-// Stakes in chips: fixed bet per round, raise cap and ante.
-constexpr int kLeducRound1Bet = 2;
-constexpr int kLeducRound2Bet = 4;
-constexpr int kLeducMaxRaisesPerRound = 2;
-constexpr int kLeducAnte = 1;
+// Kuhn betting action codes. Dealt cards enter the history as raw
+// card ids, without kChanceCardOffset.
+constexpr Action kKuhnActionCheck = 0;
+constexpr Action kKuhnActionBet = 1;
+constexpr Action kKuhnActionCall = 2;
+constexpr Action kKuhnActionFold = 3;
 
-// Chips each player has put in so far, ante included.
-std::array<int, 2> leduc_contributions(const State& state);
-
-// Leduc hold'em: one hole card each, one board card dealt after
-// round 1, and two betting rounds.
-class LeducGame {
+// Kuhn poker: three cards, one hole card each, a one-chip ante
+// and a single one-chip bet.
+class KuhnGame {
 public:
-    static constexpr std::size_t kMaxActions = 3;
+    static constexpr std::size_t kMaxActions = 2;
 
     // The empty state, before any card is dealt.
     State initial_state() const;
@@ -54,6 +52,22 @@ public:
     // Each possible deal at a chance node with its probability.
     FixedVector<ChanceOutcome, kMaxChanceOutcomes> chance_outcomes(
         const State& state) const;
+
+private:
+    // One full Kuhn hand ends in at most three betting actions.
+    static constexpr std::size_t kMaxBettingActions = 3;
+
+    // The history without its two leading card entries.
+    static FixedVector<Action, kMaxBettingActions> betting_history(
+        const State& state);
+
+    // Chips won by player 0 at a terminal state.
+    static double player0_utility(const State& state);
+
+    // Decision point reached by the betting: 0 opening, 1 after a
+    // check, 2 after a bet, 3 after check then bet.
+    static int betting_progress(
+        const FixedVector<Action, kMaxBettingActions>& betting);
 };
 
 }

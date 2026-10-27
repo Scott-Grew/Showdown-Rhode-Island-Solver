@@ -1,5 +1,4 @@
-// Full-tree CFR and CFR+ for the games small enough to walk whole,
-// Kuhn and Leduc. The tests check the sampled solver against it.
+// Test oracle: full-tree vanilla CFR and CFR+ for Kuhn and Leduc.
 
 #pragma once
 
@@ -16,9 +15,6 @@
 namespace cfr::solver {
 
 namespace detail {
-
-// Size of the per-node stack buffers; solvers assert against it.
-inline constexpr std::size_t kMaxActionsPerInfoset = 64;
 
 // Walks every reachable node and stores, per infoset label, the
 // strategy built from that infoset's row of stored_table.

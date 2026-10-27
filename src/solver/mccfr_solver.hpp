@@ -20,7 +20,6 @@
 #include <vector>
 
 #include "game/game.hpp"
-#include "solver/cfr_solver.hpp"
 #include "solver/strategy.hpp"
 
 namespace cfr::solver {
@@ -176,15 +175,6 @@ public:
         for (std::size_t i = 0; i < loaded.size(); ++i) {
             strategy_sums_[i].store(loaded[i], std::memory_order_relaxed);
         }
-    }
-
-    // Average strategy of every reachable infoset, keyed by label.
-    StrategyProfile average_strategy() const {
-        StrategyProfile profile;
-        std::vector<double> snapshot = table_snapshot(strategy_sums_);
-        detail::collect_strategy_profile(game_, game_.initial_state(), snapshot,
-                                         kStride, average_from_sums, profile);
-        return profile;
     }
 
 private:
