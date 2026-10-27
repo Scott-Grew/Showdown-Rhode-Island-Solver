@@ -10,13 +10,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
-#include <string>
 
 namespace cfr::game {
 
 using Player = std::size_t;
 using Action = int;
-using InfosetLabel = std::string;
 
 inline constexpr Player kPlayerCount = 2;
 
@@ -127,13 +125,5 @@ concept GameLike = requires(const CandidateGame game, const State state,
     } -> std::same_as<FixedVector<ChanceOutcome, kMaxChanceOutcomes>>;
     { CandidateGame::kMaxActions } -> std::convertible_to<std::size_t>;
 };
-
-// A game that can also name each infoset as text, which
-// StrategyProfile and the tree-walking best response key on.
-template <typename CandidateGame>
-concept LabelledGame =
-    GameLike<CandidateGame> && requires(const CandidateGame game) {
-        { game.infoset_label(State{}) } -> std::same_as<InfosetLabel>;
-    };
 
 }

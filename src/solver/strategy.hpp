@@ -1,26 +1,19 @@
-// Strategy profiles and the regret-matching step the product solver uses.
+// Regret matching and the normalisation the solver applies to its tables.
 
 #pragma once
 
 #include <algorithm>
 #include <cstddef>
-#include <map>
 #include <span>
-#include <vector>
-
-#include "game/game.hpp"
 
 namespace cfr::solver {
 
 namespace detail {
 
-// Size of the per-node stack buffers; solvers assert against it.
+// Size of the per-node stack buffers; the solver asserts against it.
 inline constexpr std::size_t kMaxActionsPerInfoset = 64;
 
 }
-
-// Action probabilities per infoset label, in legal_actions order.
-using StrategyProfile = std::map<game::InfosetLabel, std::vector<double>>;
 
 // Totals at or below this count as empty and become uniform.
 inline constexpr double kStrategySumEpsilon = 1e-12;

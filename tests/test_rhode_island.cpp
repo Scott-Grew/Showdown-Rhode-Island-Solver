@@ -12,6 +12,7 @@
 #include "game/card.hpp"
 #include "game/game.hpp"
 #include "game/rhode_island.hpp"
+#include "oracles/rih_label.hpp"
 #include "tree_walk.hpp"
 
 using cfr::make_card;
@@ -322,8 +323,8 @@ TEST_CASE("rhode island: infoset_label determines the infoset index") {
     long long infosets_visited = 0;
     walk(game, state, [&](const State& s) {
         if (game.is_terminal(s) || game.is_chance(s)) return;
-        auto [entry, inserted] = label_to_index.emplace(game.infoset_label(s),
-                                                        game.infoset_index(s));
+        auto [entry, inserted] =
+            label_to_index.emplace(rih_infoset_label(s), game.infoset_index(s));
         if (!inserted) REQUIRE(entry->second == game.infoset_index(s));
         ++infosets_visited;
     });
@@ -346,8 +347,8 @@ TEST_CASE(
     preflop_state_other_opponent_hole = game.apply_action(
         preflop_state_other_opponent_hole, kChanceCardOffset + make_card(9, 3));
 
-    REQUIRE(game.infoset_label(preflop_state) ==
-            game.infoset_label(preflop_state_other_opponent_hole));
+    REQUIRE(rih_infoset_label(preflop_state) ==
+            rih_infoset_label(preflop_state_other_opponent_hole));
     REQUIRE(game.infoset_index(preflop_state) ==
             game.infoset_index(preflop_state_other_opponent_hole));
 
@@ -367,8 +368,8 @@ TEST_CASE(
         game.apply_action(postflop_state_other_opponent_hole,
                           kChanceCardOffset + make_card(5, 1));
 
-    REQUIRE(game.infoset_label(postflop_state) ==
-            game.infoset_label(postflop_state_other_opponent_hole));
+    REQUIRE(rih_infoset_label(postflop_state) ==
+            rih_infoset_label(postflop_state_other_opponent_hole));
     REQUIRE(game.infoset_index(postflop_state) ==
             game.infoset_index(postflop_state_other_opponent_hole));
 }

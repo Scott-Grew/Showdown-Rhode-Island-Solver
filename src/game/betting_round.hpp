@@ -10,7 +10,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <string>
 
 #include "game/game.hpp"
 
@@ -39,27 +38,6 @@ constexpr int closing_sequence_count(int max_raises) {
 inline int closing_sequence(int raises, bool opened_with_check,
                             int max_raises) {
     return opened_with_check ? raises : raises + max_raises;
-}
-
-// Codes 0..max_raises opened with a check; a bet-open line sits above.
-inline bool closing_opened_with_check(int closing, int max_raises) {
-    return closing <= max_raises;
-}
-
-inline int closing_raises(int closing, int max_raises) {
-    return closing_opened_with_check(closing, max_raises)
-               ? closing
-               : closing - max_raises;
-}
-
-// One action list exists for a raise count, an opening check, and
-// whether the round closed, so a label does not rescan history.
-// Check and call both print as "call"; bet and raise both as "raise".
-inline void append_round_actions(std::string& label, int raises,
-                                 bool opened_with_check, bool closed) {
-    if (opened_with_check) label += "call,";
-    for (int i = 0; i < raises; ++i) label += "raise,";
-    if (closed) label += "call,";
 }
 
 inline Action last_action(const State& state) {

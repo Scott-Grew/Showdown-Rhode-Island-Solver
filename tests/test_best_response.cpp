@@ -7,7 +7,6 @@
 
 #include "oracles/best_response.hpp"
 #include "oracles/kuhn.hpp"
-#include "solver/strategy.hpp"
 #include "tree_walk.hpp"
 
 using namespace cfr::game;

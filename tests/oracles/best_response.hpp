@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "game/game.hpp"
-#include "solver/strategy.hpp"
+#include "oracles/labels.hpp"
 
 namespace cfr::solver {
 

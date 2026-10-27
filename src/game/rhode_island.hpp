@@ -6,7 +6,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <string>
 
 #include "game/betting_round.hpp"
 #include "game/card.hpp"
@@ -25,9 +24,6 @@ constexpr int kRihRound3Bet = 20;
 constexpr int kRihMaxRaisesPerRound = 3;
 constexpr int kRihAnte = 5;
 
-// Two-character card text such as "As" or "Tc".
-std::string rih_card_name(int card);
-
 // One hole card each, two board cards dealt one at a time, three rounds.
 class RhodeIslandGame {
 public:
@@ -43,7 +39,6 @@ public:
     FixedVector<Action, kMaxActions> legal_actions(const State& state) const;
     State apply_action(const State& state, Action action) const;
     double terminal_utility(const State& state, Player player) const;
-    InfosetLabel infoset_label(const State& state) const;
     std::uint32_t infoset_count() const;
     std::uint32_t infoset_index(const State& state) const;
     FixedVector<ChanceOutcome, kMaxChanceOutcomes> chance_outcomes(

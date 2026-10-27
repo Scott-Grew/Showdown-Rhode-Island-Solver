@@ -11,7 +11,6 @@
 #include <cstdint>
 #include <optional>
 #include <span>
-#include <string>
 
 #include "abstraction/rih_gameshrink.hpp"
 #include "eval/eval3.hpp"
@@ -29,15 +28,6 @@ static_assert(GameLike<RhodeIslandGame>);
 static_assert(max_history_depth(kRihRoundCount, kRihMaxRaisesPerRound,
                                 kRihCardsDealt) <=
               static_cast<int>(kMaxHistory));
-
-std::string rih_card_name(int card) {
-    static const char* const kRankNames[] = {"2", "3", "4", "5", "6", "7", "8",
-                                             "9", "T", "J", "Q", "K", "A"};
-    static const char* const kSuitNames[] = {"c", "d", "h", "s"};
-    Card typed_card = static_cast<Card>(card);
-    return std::string(kRankNames[card_rank(typed_card)]) +
-           kSuitNames[card_suit(typed_card)];
-}
 
 namespace {
 
@@ -168,30 +158,6 @@ double RhodeIslandGame::terminal_utility(const State& state,
         return settle(state.contribution, opponent(folder), player);
     }
     return settle(state.contribution, showdown_winner(state), player);
-}
-
-// "P<player>:<hole>|<board>:<r1>;<r2>;<r3>". Names stay finer than
-// the GameShrink index. Each round's text is fixed by its counters.
-InfosetLabel RhodeIslandGame::infoset_label(const State& state) const {
-    Player acting_player = current_player(state);
-    std::string label = "P" + std::to_string(acting_player) + ":" +
-                        rih_card_name(state.hole_cards[acting_player]);
-    for (std::uint8_t index = 0; index < state.board_count; ++index)
-        label += "|" + rih_card_name(state.board_cards[index]);
-    label += ":";
-    for (int round = 0; round < kRihRoundCount; ++round) {
-        if (round > 0) label += ";";
-        if (round < state.board_count) {
-            int code = state.closing[static_cast<std::size_t>(round)];
-            append_round_actions(
-                label, closing_raises(code, kRihMaxRaisesPerRound),
-                closing_opened_with_check(code, kRihMaxRaisesPerRound), true);
-        } else if (round == state.board_count) {
-            append_round_actions(label, state.raises_used,
-                                 opened_with_check(state), false);
-        }
-    }
-    return label;
 }
 
 // Rows of the three rounds. P = 8 progress codes, S = 7 closing

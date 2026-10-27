@@ -14,7 +14,7 @@
 
 #include "game/betting_round.hpp"
 #include "game/game.hpp"
-#include "solver/strategy.hpp"
+#include "oracles/labels.hpp"
 
 namespace cfr::game {
 
