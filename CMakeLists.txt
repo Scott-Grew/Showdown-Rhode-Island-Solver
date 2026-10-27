@@ -57,7 +57,7 @@ target_compile_definitions(cfr_grader PUBLIC CFR_GSI_DATA_DIR="${CMAKE_SOURCE_DI
 add_executable(cfr_measure
     src/measure/rih_exploitability.cpp
 )
-target_link_libraries(cfr_measure PRIVATE cfr_game cfr_eval cfr_solver cfr_grader)
+target_link_libraries(cfr_measure PRIVATE cfr_solver cfr_grader)
 
 add_executable(cfr_tests
     tests/oracles/kuhn.cpp
@@ -80,7 +80,7 @@ add_executable(cfr_tests
     tests/naive_ref.cpp
 )
 target_include_directories(cfr_tests PRIVATE ${CMAKE_SOURCE_DIR}/tests)
-target_link_libraries(cfr_tests PRIVATE cfr_game cfr_eval cfr_solver cfr_grader Catch2::Catch2WithMain)
+target_link_libraries(cfr_tests PRIVATE cfr_solver cfr_grader Catch2::Catch2WithMain)
 
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 include(CTest)

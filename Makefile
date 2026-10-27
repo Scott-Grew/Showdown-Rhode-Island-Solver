@@ -1,16 +1,14 @@
-.PHONY: build test test-gcc format-check verify-discovery asan tsan clean \
+.PHONY: build test format-check verify-discovery asan tsan clean \
 	bench headline
 
 RELEASE_DIR := .build/release
 ASAN_DIR := .build/asan
 TSAN_DIR := .build/tsan
-GCC_IMAGE := cfr-gcc
-GCC_VOLUME := cfr-gcc-build
 GSI_JAR_URL := https://www.cs.cmu.edu/~gilpin/GSI.jar
 GSI_JAR_SHA256 := 24ab45f190cf7c54ed9bf2cbe4227e7e97ff886bed31b0cbd41df562b2737eba
 
 format-check:
-	clang-format --dry-run --Werror $$(git ls-files 'src/*.[ch]pp' 'tests/*.[ch]pp' 'tests/oracles/*.[ch]pp')
+	clang-format --dry-run --Werror $$(git ls-files 'src/*.[ch]pp' 'tests/*.[ch]pp')
 
 build:
 	cmake -B $(RELEASE_DIR) -DCMAKE_BUILD_TYPE=Release
@@ -71,16 +69,6 @@ verify-discovery: build
 
 test: data/gsi/partition verify-discovery
 	ctest --test-dir $(RELEASE_DIR) --output-on-failure
-
-test-gcc: data/gsi/partition
-	docker build -t $(GCC_IMAGE) - < Dockerfile
-	docker run --rm -v "$(CURDIR)":/src:ro \
-		-v $(GCC_VOLUME):/build $(GCC_IMAGE) sh -c '\
-		cmake -S /src -B /build/release \
-			-DCMAKE_BUILD_TYPE=Release \
-			-DFETCHCONTENT_BASE_DIR=/build/deps \
-		&& cmake --build /build/release -j4 \
-		&& ctest --test-dir /build/release --output-on-failure'
 
 asan:
 	cmake -B $(ASAN_DIR) -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
