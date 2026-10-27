@@ -106,16 +106,14 @@ private:
     RihCardVector terminal_value(const State& state,
                                  const RihCardVector& opponent_reach,
                                  const BoardRanks* ranks) const {
-        ParsedRounds parsed = parse_rounds(state);
-        std::span<const Action> final_round = active_round_actions(parsed);
-        std::array<int, 2> contributions = rih_contributions(state);
-
         RihCardVector value;
-        if (folded(final_round)) {
-            Player folder = (final_round.size() - 1) % kPlayerCount;
-            value = fold_value(state, folder, contributions, opponent_reach);
+        if (folded(state)) {
+            Player folder =
+                (static_cast<std::size_t>(state.round_len) - 1) % kPlayerCount;
+            value =
+                fold_value(state, folder, state.contribution, opponent_reach);
         } else {
-            double stake = static_cast<double>(contributions[responder_]);
+            double stake = static_cast<double>(state.contribution[responder_]);
             value = showdown_value(stake, opponent_reach, *ranks);
         }
         clear_board_cards(state, value);
@@ -232,10 +230,9 @@ private:
         auto actions = game_.legal_actions(state);
         RihCardVector value{};
 
-        ParsedRounds parsed = parse_rounds(state);
         bool maximize_here =
             maximize_ && (deviation_round_ == kDeviateInEveryRound ||
-                          parsed.board_cards_dealt == deviation_round_);
+                          state.board_count == deviation_round_);
 
         std::vector<double> probabilities_by_card;
         if (!maximize_here)

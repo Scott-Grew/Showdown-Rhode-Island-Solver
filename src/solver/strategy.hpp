@@ -41,7 +41,6 @@ inline void normalize_or_uniform(std::span<double> values,
     for (double& value : values) value = uniform_probability;
 }
 
-// Average strategy of one infoset from its accumulated sums.
 inline std::vector<double> average_from_sums(
     std::span<const double> strategy_sum) {
     std::vector<double> strategy(strategy_sum.begin(), strategy_sum.end());
@@ -65,7 +64,6 @@ inline void regret_matching_strategy_into(
     regret_matching_in_place(strategy);
 }
 
-// Regret matching returned as its own vector.
 inline std::vector<double> regret_matching_strategy(
     std::span<const double> cumulative_regrets) {
     std::vector<double> strategy(cumulative_regrets.size());

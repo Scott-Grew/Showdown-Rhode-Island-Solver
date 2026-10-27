@@ -30,7 +30,6 @@ static_assert(max_history_depth(kRihRoundCount, kRihMaxRaisesPerRound,
                                 kRihCardsDealt) <=
               static_cast<int>(kMaxHistory));
 
-// Rank character followed by suit character.
 std::string rih_card_name(int card) {
     static const char* const kRankNames[] = {"2", "3", "4", "5", "6", "7", "8",
                                              "9", "T", "J", "Q", "K", "A"};
@@ -38,11 +37,6 @@ std::string rih_card_name(int card) {
     Card typed_card = static_cast<Card>(card);
     return std::string(kRankNames[card_rank(typed_card)]) +
            kSuitNames[card_suit(typed_card)];
-}
-
-// Ante plus the bets of each round played so far.
-std::array<int, 2> rih_contributions(const State& state) {
-    return {state.contribution[0], state.contribution[1]};
 }
 
 namespace {
@@ -120,35 +114,28 @@ State RhodeIslandGame::initial_state() const {
     return state;
 }
 
-// True while a hole card is missing, or when a round has closed
-// and fewer than two board cards are out.
 bool RhodeIslandGame::is_chance(const State& state) const {
     if (state.hole_cards[0] == -1 || state.hole_cards[1] == -1) return true;
     if (state.board_count >= 2) return false;
     return round_closed(state);
 }
 
-// A fold ends the hand in any round; otherwise it ends when
-// round 3 closes.
 bool RhodeIslandGame::is_terminal(const State& state) const {
     if (is_chance(state)) return false;
     if (state.board_count < 2) return folded(state);
     return folded(state) || round_closed(state);
 }
 
-// Player to act in the active round.
 Player RhodeIslandGame::current_player(const State& state) const {
     assert(!is_chance(state) && !is_terminal(state));
     return static_cast<std::size_t>(state.round_len) % kPlayerCount;
 }
 
-// Legal actions of the active round under the raise cap.
 FixedVector<Action, RhodeIslandGame::kMaxActions>
 RhodeIslandGame::legal_actions(const State& state) const {
     return round_legal_actions<kMaxActions>(state, kRihMaxRaisesPerRound);
 }
 
-// Fixed bet of the round now in progress.
 int bet_size_of(const State& state) {
     if (state.board_count == 0) return kRihRound1Bet;
     if (state.board_count == 1) return kRihRound2Bet;
@@ -173,36 +160,37 @@ State RhodeIslandGame::apply_action(const State& state, Action action) const {
     return next;
 }
 
-// A fold pays the other player; otherwise the showdown
-// decides, and a tie pays zero.
 double RhodeIslandGame::terminal_utility(const State& state,
                                          Player player) const {
-    std::array<int, 2> contributions = rih_contributions(state);
     if (folded(state)) {
         Player folder =
             (static_cast<std::size_t>(state.round_len) - 1) % kPlayerCount;
-        return settle(contributions, opponent(folder), player);
+        return settle(state.contribution, opponent(folder), player);
     }
-    return settle(contributions, showdown_winner(state), player);
+    return settle(state.contribution, showdown_winner(state), player);
 }
 
-// Builds "P<player>:<hole>|<board>:<r1>;<r2>;<r3>" with full card
-// names. Labels stay finer than the GameShrink index.
+// "P<player>:<hole>|<board>:<r1>;<r2>;<r3>". Names stay finer than
+// the GameShrink index. Each round's text is fixed by its counters.
 InfosetLabel RhodeIslandGame::infoset_label(const State& state) const {
     Player acting_player = current_player(state);
-    ParsedRounds parsed = parse_rounds(state);
-
     std::string label = "P" + std::to_string(acting_player) + ":" +
                         rih_card_name(state.hole_cards[acting_player]);
-    for (std::uint8_t index = 0; index < state.board_count; ++index) {
+    for (std::uint8_t index = 0; index < state.board_count; ++index)
         label += "|" + rih_card_name(state.board_cards[index]);
-    }
     label += ":";
-    for (Action action : parsed.round(0)) label += action_name(action) + ",";
-    label += ";";
-    for (Action action : parsed.round(1)) label += action_name(action) + ",";
-    label += ";";
-    for (Action action : parsed.round(2)) label += action_name(action) + ",";
+    for (int round = 0; round < kRihRoundCount; ++round) {
+        if (round > 0) label += ";";
+        if (round < state.board_count) {
+            int code = state.closing[static_cast<std::size_t>(round)];
+            append_round_actions(
+                label, closing_raises(code, kRihMaxRaisesPerRound),
+                closing_opened_with_check(code, kRihMaxRaisesPerRound), true);
+        } else if (round == state.board_count) {
+            append_round_actions(label, state.raises_used,
+                                 opened_with_check(state), false);
+        }
+    }
     return label;
 }
 
@@ -266,7 +254,6 @@ std::uint32_t RhodeIslandGame::infoset_index(const State& state) const {
            card_class;
 }
 
-// Uniform over the undealt cards of the deck.
 FixedVector<ChanceOutcome, kMaxChanceOutcomes> RhodeIslandGame::chance_outcomes(
     const State& state) const {
     return deal_outcomes(state, kCardCount);

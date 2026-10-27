@@ -43,8 +43,6 @@ template <typename GameT>
     requires game::GameLike<GameT>
 class ExternalSamplingSolver {
 public:
-    // Allocates zeroed tables; seed fixes
-    // every worker's random stream.
     ExternalSamplingSolver(const GameT& game, std::uint64_t seed)
         : game_(game),
           cumulative_regrets_(static_cast<std::size_t>(game.infoset_count()) *
@@ -109,8 +107,6 @@ public:
         return total;
     }
 
-    // Writes one infoset's average strategy into the first
-    // action_count entries of strategy.
     void average_strategy_into(std::uint32_t infoset_index,
                                std::size_t action_count,
                                std::span<double> strategy) const {
@@ -145,8 +141,7 @@ public:
                                      "' failed, strategy is incomplete");
     }
 
-    // Reads a checkpoint and rejects a wrong size, a truncated file
-    // or trailing bytes. Regrets stay as they were.
+    // Regrets stay as they were.
     void load_strategy_sums(const std::string& path) {
         std::ifstream input(path, std::ios::binary);
         if (!input)
@@ -183,16 +178,12 @@ private:
     // Largest weighted regret residual the debug assert accepts.
     static constexpr double kRegretResidualTolerance = 1e-6;
 
-    // State owned by one worker thread: its
-    // random engine and its visit counter.
     struct TraversalContext {
-        // Seeds this worker's engine.
         explicit TraversalContext(std::uint64_t seed) : random_engine(seed) {}
         std::mt19937_64 random_engine;
         std::uint64_t opponent_node_visits = 0;
     };
 
-    // Plain copy of an atomic table, read entry by entry.
     static std::vector<double> table_snapshot(
         const std::vector<std::atomic<double>>& table) {
         std::vector<double> snapshot(table.size());
@@ -264,8 +255,6 @@ private:
         }
     }
 
-    // Regret-matching strategy of one infoset, read from the live
-    // regret table into strategy, one entry per legal action.
     void current_strategy_into(std::size_t table_offset,
                                std::span<double> strategy) const {
         for (std::size_t i = 0; i < strategy.size(); ++i) {

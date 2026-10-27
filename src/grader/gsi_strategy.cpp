@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <cassert>
 #include <fstream>
-#include <utility>
 
 #include "game/card.hpp"
 #include "game/rhode_island.hpp"
@@ -72,14 +71,6 @@ int signal_index(int hole, int board0, int board1) {
            (signal_index(hole, board0) - kCardCount);
 }
 
-// 0 when no bet is faced, otherwise the number of raises so far.
-int decision_type(std::span<const game::Action> round_actions) {
-    if (round_actions.empty() || round_actions.back() != game::kActionRaise)
-        return 0;
-    return static_cast<int>(std::count(
-        round_actions.begin(), round_actions.end(), game::kActionRaise));
-}
-
 }
 
 // Board cards are GSI card ids and betting is GSI sequence ids;
@@ -94,27 +85,24 @@ struct GsiStrategy::PublicContext {
     game::Player acting_player = 0;
 };
 
-// Parses the history once. A sequence id is filled only for a
-// round that has closed.
+// Sequence ids are the closing codes stored when each board card
+// was dealt. decision_type is 0 with no bet faced, else the raise count.
 GsiStrategy::PublicContext GsiStrategy::public_context(
     const game::State& state) {
-    game::ParsedRounds parsed = game::parse_rounds(state);
-    std::span<const game::Action> round_actions =
-        game::active_round_actions(parsed);
-
     PublicContext context;
-    context.board_cards_dealt = parsed.board_cards_dealt;
-    context.decision_type = decision_type(round_actions);
-    context.acting_player = round_actions.size() % game::kPlayerCount;
-    if (parsed.board_cards_dealt >= 1) {
+    context.board_cards_dealt = state.board_count;
+    bool facing_bet =
+        state.round_len != 0 && game::last_action(state) == game::kActionRaise;
+    context.decision_type =
+        facing_bet ? static_cast<int>(state.raises_used) : 0;
+    context.acting_player = state.round_len % game::kPlayerCount;
+    if (state.board_count >= 1) {
         context.board0 = gsi_card(static_cast<Card>(state.board_cards[0]));
-        context.sequence1 = game::closing_sequence(parsed.round(0),
-                                                   game::kRihMaxRaisesPerRound);
+        context.sequence1 = state.closing[0];
     }
-    if (parsed.board_cards_dealt >= 2) {
+    if (state.board_count >= 2) {
         context.board1 = gsi_card(static_cast<Card>(state.board_cards[1]));
-        context.sequence2 = game::closing_sequence(parsed.round(1),
-                                                   game::kRihMaxRaisesPerRound);
+        context.sequence2 = state.closing[1];
     }
     return context;
 }

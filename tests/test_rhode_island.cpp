@@ -294,7 +294,7 @@ TEST_CASE("rhode island: round transitions through flop and turn to terminal") {
     state = game.apply_action(state, kActionCallCheck);
     state = game.apply_action(state, kActionCallCheck);
     REQUIRE(game.is_terminal(state));
-    REQUIRE(rih_contributions(state)[0] + rih_contributions(state)[1] == 10);
+    REQUIRE(state.contribution[0] + state.contribution[1] == 10);
 }
 
 TEST_CASE(
@@ -400,7 +400,7 @@ TEST_CASE(
     state = game.apply_action(state, kActionFold);
 
     REQUIRE(game.is_terminal(state));
-    REQUIRE(rih_contributions(state)[0] + rih_contributions(state)[1] == 20);
+    REQUIRE(state.contribution[0] + state.contribution[1] == 20);
     REQUIRE(game.terminal_utility(state, 0) == -5.0);
     REQUIRE(game.terminal_utility(state, 1) == 5.0);
 }
@@ -424,7 +424,7 @@ TEST_CASE(
     state = game.apply_action(state, kActionCallCheck);
 
     REQUIRE(game.is_terminal(state));
-    REQUIRE(rih_contributions(state)[0] + rih_contributions(state)[1] == 10);
+    REQUIRE(state.contribution[0] + state.contribution[1] == 10);
     REQUIRE(game.terminal_utility(state, 1) == 5.0);
     REQUIRE(game.terminal_utility(state, 0) == -5.0);
     REQUIRE(game.terminal_utility(state, 0) + game.terminal_utility(state, 1) ==
@@ -609,7 +609,7 @@ TEST_CASE(
 TEST_CASE("rhode island re-raise line pot is exact at every step") {
     RhodeIslandGame game;
     auto pot_of = [](const State& s) {
-        std::array<int, 2> contributions = rih_contributions(s);
+        std::array<int, 2> contributions = s.contribution;
         return contributions[0] + contributions[1];
     };
     State state = game.initial_state();
@@ -640,8 +640,7 @@ TEST_CASE(
             kActionFold)
             return;
         ++showdown_terminals;
-        std::array<int, 2> contributions =
-            rih_contributions(terminal_candidate);
+        std::array<int, 2> contributions = terminal_candidate.contribution;
         REQUIRE(contributions[0] == contributions[1]);
         int pot = contributions[0] + contributions[1];
         REQUIRE(pot % 2 == 0);

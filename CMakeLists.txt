@@ -54,11 +54,6 @@ target_include_directories(cfr_grader PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(cfr_grader PUBLIC cfr_game)
 target_compile_definitions(cfr_grader PUBLIC CFR_GSI_DATA_DIR="${CMAKE_SOURCE_DIR}/data/gsi")
 
-add_executable(cfr_play
-    src/demo/play_rih.cpp
-)
-target_link_libraries(cfr_play PRIVATE cfr_game cfr_eval cfr_grader)
-
 add_executable(cfr_measure
     src/measure/rih_exploitability.cpp
 )

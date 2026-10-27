@@ -22,16 +22,14 @@ cfr::solver::RihStrategyQuery player0_bets_only_in_round(int target_round) {
     return [target_round](const State& state, Player acting_player,
                           std::vector<double>& probabilities) {
         RhodeIslandGame game;
-        ParsedRounds parsed = parse_rounds(state);
-        std::span<const Action> round_actions = active_round_actions(parsed);
         std::size_t action_count = game.legal_actions(state).size();
         probabilities.assign(
             static_cast<std::size_t>(cfr::kCardCount) * action_count, 0.0);
 
         bool facing_bet =
-            !round_actions.empty() && round_actions.back() == kActionRaise;
+            state.round_len != 0 && last_action(state) == kActionRaise;
         std::size_t choice = !facing_bet && acting_player == 0 &&
-                                     parsed.board_cards_dealt == target_round
+                                     state.board_count == target_round
                                  ? 1
                                  : 0;
         for (int card = 0; card < cfr::kCardCount; ++card) {

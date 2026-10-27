@@ -11,7 +11,6 @@
 #include <cstdint>
 #include <initializer_list>
 #include <string>
-#include <utility>
 
 namespace cfr::game {
 
@@ -63,13 +62,6 @@ public:
     T* end() { return data_.data() + size_; }
     const T* end() const { return data_.data() + size_; }
 
-    bool operator==(const FixedVector& other) const {
-        if (size_ != other.size_) return false;
-        for (std::size_t index = 0; index < size_; ++index)
-            if (!(data_[index] == other.data_[index])) return false;
-        return true;
-    }
-
 private:
     std::array<T, N> data_;
     std::size_t size_ = 0;
@@ -108,8 +100,6 @@ struct State {
 
 static_assert(sizeof(State) <= 64, "State must stay a cheap copy");
 
-// One branch of a chance node: the
-// dealing action and how likely it is.
 struct ChanceOutcome {
     Action action;
     double probability;

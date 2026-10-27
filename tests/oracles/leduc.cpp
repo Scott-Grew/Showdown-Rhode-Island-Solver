@@ -56,11 +56,6 @@ constexpr int kLeducRoundProgressCount =
     round_progress_count(kLeducMaxRaisesPerRound);
 constexpr int kLeducFinalProgressCount = kLeducRoundProgressCount - 1;
 
-// True once the board card is out.
-bool board_card_dealt(const ParsedRounds& parsed) {
-    return parsed.board_cards_dealt >= 1;
-}
-
 }
 
 // Ante plus the bets of each round played so far.
@@ -132,20 +127,26 @@ double LeducGame::terminal_utility(const State& state, Player player) const {
     return settle(contributions, showdown_winner(state), player);
 }
 
-// Builds "P<player>:<card>|<board>:<round 1>;<round 2>".
+// "P<player>:<card>|<board>:<round 1>;<round 2>".
 InfosetLabel LeducGame::infoset_label(const State& state) const {
     Player acting_player = current_player(state);
-    ParsedRounds parsed = parse_rounds(state);
-
     std::string label = "P" + std::to_string(acting_player) + ":" +
                         card_name(state.hole_cards[acting_player]);
-    if (state.board_count != 0) {
-        label += "|" + card_name(state.board_cards[0]);
-    }
+    if (state.board_count != 0) label += "|" + card_name(state.board_cards[0]);
     label += ":";
-    for (Action action : parsed.round(0)) label += action_name(action) + ",";
+    if (state.board_count == 0) {
+        append_round_actions(label, state.raises_used, opened_with_check(state),
+                             false);
+    } else {
+        int code = state.closing[0];
+        append_round_actions(
+            label, closing_raises(code, kLeducMaxRaisesPerRound),
+            closing_opened_with_check(code, kLeducMaxRaisesPerRound), true);
+    }
     label += ";";
-    for (Action action : parsed.round(1)) label += action_name(action) + ",";
+    if (state.board_count != 0)
+        append_round_actions(label, state.raises_used, opened_with_check(state),
+                             false);
     return label;
 }
 
@@ -161,18 +162,19 @@ std::uint32_t LeducGame::infoset_count() const {
 // follow, keyed by round 1 ending, progress and both ranks.
 std::uint32_t LeducGame::infoset_index(const State& state) const {
     Player acting_player = current_player(state);
-    ParsedRounds parsed = parse_rounds(state);
     int hole_rank = leduc_card_rank(state.hole_cards[acting_player]);
 
-    if (!board_card_dealt(parsed)) {
-        int round1_progress = round_progress(parsed.round(0));
+    if (state.board_count == 0) {
         return static_cast<std::uint32_t>(
-            round1_progress * kLeducCardRankCount + hole_rank);
+            round_progress(state) * kLeducCardRankCount + hole_rank);
     }
 
-    // A closed round has progress 1..5, shifted here to 0..4.
-    int round1_final_progress = round_progress(parsed.round(0)) - 1;
-    int round2_progress = round_progress(parsed.round(1));
+    // Closed-round progress is 1..5; the row stores that minus one.
+    int code = state.closing[0];
+    int raises = closing_raises(code, kLeducMaxRaisesPerRound);
+    bool opened = closing_opened_with_check(code, kLeducMaxRaisesPerRound);
+    int round1_final_progress = raises * 2 + (opened ? 1 : 0) - 1;
+    int round2_progress = round_progress(state);
     int board_rank = leduc_card_rank(state.board_cards[0]);
 
     int round2_offset =

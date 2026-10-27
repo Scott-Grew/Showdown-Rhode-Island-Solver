@@ -83,7 +83,6 @@ struct RankGroups {
     std::array<int, 3> single_ranks = {kNoRank, kNoRank, kNoRank};
 };
 
-// Groups the ranks from a count per rank.
 RankGroups group_ranks(const std::array<int, kRankCount>& rank_counts) {
     RankGroups groups;
     std::size_t single_count = 0;
@@ -98,15 +97,13 @@ RankGroups group_ranks(const std::array<int, kRankCount>& rank_counts) {
     return groups;
 }
 
-// Packs a category and an order within it into one HandRank.
 HandRank hand_rank(int category, int order_within_category) {
     return static_cast<HandRank>(category * kCategoryBudget +
                                  order_within_category);
 }
 }
 
-// Returns category * kCategoryBudget + a within-category order, so
-// plain integer comparison decides a showdown.
+// category * kCategoryBudget + order, so integer comparison is the showdown.
 HandRank evaluate_3card(const Card* cards) {
     std::array<int, kRankCount> rank_counts = {};
     std::uint32_t rank_bitmask = 0;
