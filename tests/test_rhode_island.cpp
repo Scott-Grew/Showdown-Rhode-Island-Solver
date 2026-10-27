@@ -134,7 +134,7 @@ SequenceFormSize count_fixed_card_sequence_form_size(
         }
         Player player = game.current_player(node);
         long long own_information_count = classes[node.board_count];
-        std::vector<Action> legal = game.legal_actions(node);
+        auto legal = game.legal_actions(node);
         totals.infosets[player] += own_information_count;
         totals.sequences[player] +=
             own_information_count * static_cast<long long>(legal.size());
@@ -239,7 +239,7 @@ TEST_CASE(
 
     REQUIRE_FALSE(game.is_chance(state));
     REQUIRE(game.current_player(state) == 0);
-    std::vector<Action> legal = game.legal_actions(state);
+    auto legal = game.legal_actions(state);
     REQUIRE(legal.size() == 2);
     REQUIRE(std::find(legal.begin(), legal.end(), kActionCallCheck) !=
             legal.end());
@@ -257,7 +257,7 @@ TEST_CASE("rhode island: raise cap enforced at 3 per round") {
     state = game.apply_action(state, kActionRaise);
 
     REQUIRE_FALSE(game.is_terminal(state));
-    std::vector<Action> legal = game.legal_actions(state);
+    auto legal = game.legal_actions(state);
     REQUIRE(std::find(legal.begin(), legal.end(), kActionRaise) == legal.end());
     REQUIRE(std::find(legal.begin(), legal.end(), kActionFold) != legal.end());
     REQUIRE(std::find(legal.begin(), legal.end(), kActionCallCheck) !=
@@ -274,8 +274,8 @@ TEST_CASE("rhode island: round transitions through flop and turn to terminal") {
     state = game.apply_action(state, kActionCallCheck);
     REQUIRE(game.is_chance(state));
 
-    std::vector<ChanceOutcome> flop_outcomes = game.chance_outcomes(state);
-    state = game.apply_action(state, flop_outcomes.front().action);
+    auto flop_outcomes = game.chance_outcomes(state);
+    state = game.apply_action(state, flop_outcomes[0].action);
     REQUIRE_FALSE(game.is_chance(state));
     REQUIRE_FALSE(game.is_terminal(state));
     REQUIRE(game.current_player(state) == 0);
@@ -284,8 +284,8 @@ TEST_CASE("rhode island: round transitions through flop and turn to terminal") {
     state = game.apply_action(state, kActionCallCheck);
     REQUIRE(game.is_chance(state));
 
-    std::vector<ChanceOutcome> turn_outcomes = game.chance_outcomes(state);
-    state = game.apply_action(state, turn_outcomes.front().action);
+    auto turn_outcomes = game.chance_outcomes(state);
+    state = game.apply_action(state, turn_outcomes[0].action);
     REQUIRE_FALSE(game.is_chance(state));
     REQUIRE_FALSE(game.is_terminal(state));
     REQUIRE(game.current_player(state) == 0);
@@ -302,17 +302,17 @@ TEST_CASE(
     State state = game.initial_state();
     REQUIRE(game.is_chance(state));
 
-    std::vector<ChanceOutcome> hole0_outcomes = game.chance_outcomes(state);
+    auto hole0_outcomes = game.chance_outcomes(state);
     REQUIRE(hole0_outcomes.size() == 52);
     double hole0_probability_sum = 0.0;
     for (auto& [action, probability] : hole0_outcomes)
         hole0_probability_sum += probability;
     REQUIRE_THAT(hole0_probability_sum, Catch::Matchers::WithinAbs(1.0, 1e-12));
 
-    Action hole0_dealt_action = hole0_outcomes.front().action;
+    Action hole0_dealt_action = hole0_outcomes[0].action;
     state = game.apply_action(state, hole0_dealt_action);
 
-    std::vector<ChanceOutcome> hole1_outcomes = game.chance_outcomes(state);
+    auto hole1_outcomes = game.chance_outcomes(state);
     REQUIRE(hole1_outcomes.size() == 51);
     for (auto& [action, probability] : hole1_outcomes)
         REQUIRE(action != hole0_dealt_action);
@@ -321,25 +321,25 @@ TEST_CASE(
         hole1_probability_sum += probability;
     REQUIRE_THAT(hole1_probability_sum, Catch::Matchers::WithinAbs(1.0, 1e-12));
 
-    state = game.apply_action(state, hole1_outcomes.front().action);
+    state = game.apply_action(state, hole1_outcomes[0].action);
     state = game.apply_action(state, kActionCallCheck);
     state = game.apply_action(state, kActionCallCheck);
     REQUIRE(game.is_chance(state));
 
-    std::vector<ChanceOutcome> flop_outcomes = game.chance_outcomes(state);
+    auto flop_outcomes = game.chance_outcomes(state);
     REQUIRE(flop_outcomes.size() == 50);
     double flop_probability_sum = 0.0;
     for (auto& [action, probability] : flop_outcomes)
         flop_probability_sum += probability;
     REQUIRE_THAT(flop_probability_sum, Catch::Matchers::WithinAbs(1.0, 1e-12));
 
-    Action flop_dealt_action = flop_outcomes.front().action;
+    Action flop_dealt_action = flop_outcomes[0].action;
     state = game.apply_action(state, flop_dealt_action);
     state = game.apply_action(state, kActionCallCheck);
     state = game.apply_action(state, kActionCallCheck);
     REQUIRE(game.is_chance(state));
 
-    std::vector<ChanceOutcome> turn_outcomes = game.chance_outcomes(state);
+    auto turn_outcomes = game.chance_outcomes(state);
     REQUIRE(turn_outcomes.size() == 49);
     for (auto& [action, probability] : turn_outcomes)
         REQUIRE(action != flop_dealt_action);

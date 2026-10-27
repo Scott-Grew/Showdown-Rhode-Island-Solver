@@ -229,7 +229,7 @@ private:
     RihCardVector responder_node(const State& state,
                                  const RihCardVector& opponent_reach,
                                  const BoardRanks* ranks) {
-        std::vector<Action> actions = game_.legal_actions(state);
+        auto actions = game_.legal_actions(state);
         RihCardVector value{};
 
         ParsedRounds parsed = parse_rounds(state);
@@ -269,7 +269,7 @@ private:
     RihCardVector opponent_node(const State& state,
                                 const RihCardVector& opponent_reach,
                                 const BoardRanks* ranks) {
-        std::vector<Action> actions = game_.legal_actions(state);
+        auto actions = game_.legal_actions(state);
         std::vector<double> probabilities_by_card;
         opponent_strategy_(state, opponent_, probabilities_by_card);
 

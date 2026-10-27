@@ -39,8 +39,9 @@ std::string action_name(Action action) {
 }
 
 // Copies the history after its leading dealt-card entries.
-std::vector<Action> KuhnGame::betting_history(const State& state) {
-    std::vector<Action> betting;
+FixedVector<Action, KuhnGame::kMaxBettingActions> KuhnGame::betting_history(
+    const State& state) {
+    FixedVector<Action, kMaxBettingActions> betting;
     for (std::uint8_t index = kKuhnDealtCardCount; index < state.history_len;
          ++index) {
         betting.push_back(state.history[index]);
@@ -62,7 +63,7 @@ bool KuhnGame::is_chance(const State& state) const {
 // gives player 0 one more decision.
 bool KuhnGame::is_terminal(const State& state) const {
     if (is_chance(state)) return false;
-    std::vector<Action> betting = betting_history(state);
+    auto betting = betting_history(state);
     if (betting.size() < 2) return false;
     if (betting.size() == 2)
         return !(betting[0] == kKuhnActionCheck &&
@@ -73,15 +74,16 @@ bool KuhnGame::is_terminal(const State& state) const {
 // Player 0 opens and also answers a bet made after a check.
 Player KuhnGame::current_player(const State& state) const {
     assert(!is_chance(state) && !is_terminal(state));
-    std::vector<Action> betting = betting_history(state);
+    auto betting = betting_history(state);
     if (betting.empty()) return 0;
     if (betting.size() == 1) return 1;
     return 0;
 }
 
 // Check or bet until someone bets, then call or fold.
-std::vector<Action> KuhnGame::legal_actions(const State& state) const {
-    std::vector<Action> betting = betting_history(state);
+FixedVector<Action, KuhnGame::kMaxActions> KuhnGame::legal_actions(
+    const State& state) const {
+    auto betting = betting_history(state);
     if (betting.empty()) return {kKuhnActionCheck, kKuhnActionBet};
     if (betting.size() == 1) {
         if (betting[0] == kKuhnActionCheck)
@@ -112,7 +114,7 @@ State KuhnGame::apply_action(const State& state, Action action) const {
 // A showdown pays 1 after check-check and 2 after a called bet; a
 // fold pays 1 to the bettor.
 double KuhnGame::player0_utility(const State& state) {
-    std::vector<Action> betting = betting_history(state);
+    auto betting = betting_history(state);
     bool player0_has_higher_card = state.hole_cards[0] > state.hole_cards[1];
 
     if (betting.size() == 2) {
@@ -140,7 +142,7 @@ double KuhnGame::terminal_utility(const State& state, Player player) const {
 // Builds "P<player>:<card>:<actions>" for the acting player.
 InfosetLabel KuhnGame::infoset_label(const State& state) const {
     Player acting_player = current_player(state);
-    std::vector<Action> betting = betting_history(state);
+    auto betting = betting_history(state);
 
     std::string label = "P" + std::to_string(acting_player) + ":" +
                         card_name(state.hole_cards[acting_player]) + ":";
@@ -151,7 +153,8 @@ InfosetLabel KuhnGame::infoset_label(const State& state) const {
 }
 
 // 0 opening, 1 after a check, 2 after a bet, 3 after check then bet.
-int KuhnGame::betting_progress(const std::vector<Action>& betting) {
+int KuhnGame::betting_progress(
+    const FixedVector<Action, kMaxBettingActions>& betting) {
     if (betting.empty()) return 0;
     if (betting.size() == 1) return betting[0] == kKuhnActionCheck ? 1 : 2;
     return 3;
@@ -165,7 +168,7 @@ std::uint32_t KuhnGame::infoset_count() const {
 // Row is betting progress * deck size + the acting player's card.
 std::uint32_t KuhnGame::infoset_index(const State& state) const {
     Player acting_player = current_player(state);
-    std::vector<Action> betting = betting_history(state);
+    auto betting = betting_history(state);
     int progress = betting_progress(betting);
     return static_cast<std::uint32_t>(progress * kKuhnDeckSize +
                                       state.hole_cards[acting_player]);
@@ -173,8 +176,9 @@ std::uint32_t KuhnGame::infoset_index(const State& state) const {
 
 // Player 0's card is uniform over the deck; player 1's is uniform
 // over the two cards left.
-std::vector<ChanceOutcome> KuhnGame::chance_outcomes(const State& state) const {
-    std::vector<ChanceOutcome> outcomes;
+FixedVector<ChanceOutcome, kMaxChanceOutcomes> KuhnGame::chance_outcomes(
+    const State& state) const {
+    FixedVector<ChanceOutcome, kMaxChanceOutcomes> outcomes;
     if (state.hole_cards[0] == -1) {
         for (int card = 0; card < kKuhnDeckSize; ++card) {
             outcomes.push_back({card, 1.0 / kKuhnDeckSize});

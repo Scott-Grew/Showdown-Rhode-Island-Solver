@@ -13,7 +13,6 @@
 #include <span>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include "game/game.hpp"
 
@@ -35,7 +34,6 @@ constexpr Action kChanceCardOffset = 100;
 // Array bounds for ParsedRounds, and the hole-card deal count.
 constexpr std::size_t kMaxBettingRounds = 3;
 constexpr int kHoleCardsDealt = 2;
-constexpr std::size_t kMaxActionsPerRound = 8;
 
 // The betting actions of a history split by round, plus the number
 // of board cards dealt so far.
@@ -98,11 +96,6 @@ inline bool round_closed(std::span<const Action> round_actions) {
     return previous == kActionCallCheck || previous == kActionRaise;
 }
 
-// Player to act in this round. Player 0 opens every round.
-inline Player round_acting_player(std::span<const Action> round_actions) {
-    return round_actions.size() % kPlayerCount;
-}
-
 // Number of bets and raises in the round; an opening bet counts.
 inline int raises_used(std::span<const Action> round_actions) {
     return static_cast<int>(
@@ -122,40 +115,41 @@ constexpr int round_progress_count(int max_raises) {
     return 2 * max_raises + 2;
 }
 
-// Legal actions in ascending code order. Fold needs a bet to face,
-// and raise is dropped once max_raises is reached.
-inline std::vector<Action> round_legal_actions(
-    std::span<const Action> round_actions, int max_raises) {
-    bool facing_bet =
-        !round_actions.empty() && round_actions.back() == kActionRaise;
-    if (!facing_bet) {
-        return {kActionCallCheck, kActionRaise};
-    }
-    if (raises_used(round_actions) < max_raises) {
-        return {kActionFold, kActionCallCheck, kActionRaise};
-    }
-    return {kActionFold, kActionCallCheck};
+// Last betting action of the active round. Those actions are the
+// last round_len entries of history; the board card that opened
+// the round sits just before them.
+inline Action last_action(const State& state) {
+    assert(state.round_len != 0);
+    return state.history[static_cast<std::size_t>(state.history_len) - 1];
 }
 
-// Adds each player's chips for one round into contributions. Every
-// raise lifts the level to match by bet_size.
-inline void apply_round_contributions(std::span<const Action> round_actions,
-                                      int bet_size,
-                                      std::array<int, 2>& contributions) {
-    std::array<int, 2> round_contributions = {0, 0};
-    int level_to_match = 0;
-    for (std::size_t index = 0; index < round_actions.size(); ++index) {
-        Player acting_player = index % kPlayerCount;
-        Action action = round_actions[index];
-        if (action == kActionRaise) {
-            level_to_match += bet_size;
-            round_contributions[acting_player] = level_to_match;
-        } else if (action == kActionCallCheck) {
-            round_contributions[acting_player] = level_to_match;
-        }
-    }
-    contributions[0] += round_contributions[0];
-    contributions[1] += round_contributions[1];
+// True when the active round's last action is a fold.
+inline bool folded(const State& state) {
+    return state.round_len != 0 && last_action(state) == kActionFold;
+}
+
+// True when the active round ended in a call, or in a check
+// answering a check. A lone opening check leaves the round open.
+inline bool round_closed(const State& state) {
+    if (state.round_len < 2) return false;
+    if (last_action(state) != kActionCallCheck) return false;
+    Action previous =
+        state.history[static_cast<std::size_t>(state.history_len) - 2];
+    return previous == kActionCallCheck || previous == kActionRaise;
+}
+
+// Legal actions in ascending code order. Fold needs a bet to face,
+// and raise is dropped once max_raises is reached. N is the caller's
+// kMaxActions.
+template <std::size_t N>
+inline FixedVector<Action, N> round_legal_actions(const State& state,
+                                                  int max_raises) {
+    bool facing_bet =
+        state.round_len != 0 && last_action(state) == kActionRaise;
+    if (!facing_bet) return {kActionCallCheck, kActionRaise};
+    if (state.raises_used < max_raises)
+        return {kActionFold, kActionCallCheck, kActionRaise};
+    return {kActionFold, kActionCallCheck};
 }
 
 // Payoff in chips to player. The winner gains the loser's
@@ -196,24 +190,71 @@ inline void deal_card(State& next, int card) {
     }
 }
 
-// Uniform chance outcomes over the undealt cards, each encoded as
-// kChanceCardOffset + card.
-inline std::vector<ChanceOutcome> deal_outcomes(const State& state,
-                                                int deck_size) {
-    std::vector<int> excluded;
-    if (state.hole_cards[0] != -1) excluded.push_back(state.hole_cards[0]);
-    if (state.hole_cards[1] != -1) excluded.push_back(state.hole_cards[1]);
-    for (std::uint8_t index = 0; index < state.board_count; ++index)
-        excluded.push_back(state.board_cards[index]);
+// Opens an empty betting round. Chips already contributed stay.
+inline void begin_next_betting_round(State& state) {
+    state.round_len = 0;
+    state.raises_used = 0;
+    state.level_to_match = 0;
+    state.round_contribution = {0, 0};
+}
 
-    int remaining_count = deck_size - static_cast<int>(excluded.size());
-    std::vector<ChanceOutcome> outcomes;
+// Deals one card. A board card starts the next betting round.
+inline void deal_and_advance(State& state, int card) {
+    bool board_card = state.hole_cards[0] != -1 && state.hole_cards[1] != -1;
+    deal_card(state, card);
+    if (board_card) begin_next_betting_round(state);
+}
+
+// Adds the chips one betting action puts in. bet_size is the fixed
+// bet of the round now in progress, and the action is already the
+// last history entry. A fold adds nothing. A raise lifts the level
+// by bet_size; a call or raise then matches it.
+inline void apply_betting_action(State& state, Action action, int bet_size) {
+    assert(action == kActionFold || action == kActionCallCheck ||
+           action == kActionRaise);
+    std::size_t acting =
+        static_cast<std::size_t>(state.round_len) % kPlayerCount;
+    assert(state.round_len < kMaxActionsPerRound);
+
+    if (action == kActionRaise) {
+        state.level_to_match += bet_size;
+        ++state.raises_used;
+    }
+    if (action == kActionRaise || action == kActionCallCheck) {
+        state.contribution[acting] +=
+            state.level_to_match - state.round_contribution[acting];
+        state.round_contribution[acting] = state.level_to_match;
+    }
+    ++state.round_len;
+}
+
+// Uniform chance outcomes over the undealt cards, each encoded as
+// kChanceCardOffset + card. Probabilities are 1/remaining, in
+// ascending card order, the same values the sampler sums.
+inline FixedVector<ChanceOutcome, kMaxChanceOutcomes> deal_outcomes(
+    const State& state, int deck_size) {
+    assert(deck_size > 0);
+    assert(deck_size <= static_cast<int>(kMaxChanceOutcomes));
+    std::array<std::uint8_t, kMaxChanceOutcomes> dealt{};
+    int excluded_count = 0;
+    if (state.hole_cards[0] != -1) {
+        dealt[static_cast<std::size_t>(state.hole_cards[0])] = 1;
+        ++excluded_count;
+    }
+    if (state.hole_cards[1] != -1) {
+        dealt[static_cast<std::size_t>(state.hole_cards[1])] = 1;
+        ++excluded_count;
+    }
+    for (std::uint8_t index = 0; index < state.board_count; ++index) {
+        dealt[static_cast<std::size_t>(state.board_cards[index])] = 1;
+        ++excluded_count;
+    }
+
+    int remaining_count = deck_size - excluded_count;
+    FixedVector<ChanceOutcome, kMaxChanceOutcomes> outcomes;
     for (int card = 0; card < deck_size; ++card) {
-        if (std::find(excluded.begin(), excluded.end(), card) ==
-            excluded.end()) {
-            outcomes.push_back(
-                {kChanceCardOffset + card, 1.0 / remaining_count});
-        }
+        if (dealt[static_cast<std::size_t>(card)] != 0) continue;
+        outcomes.push_back({kChanceCardOffset + card, 1.0 / remaining_count});
     }
     return outcomes;
 }

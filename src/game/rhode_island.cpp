@@ -41,33 +41,29 @@ std::string rih_card_name(int card) {
 
 // Ante plus the bets of each round played so far.
 std::array<int, 2> rih_contributions(const State& state) {
-    std::array<int, 2> contributions = {kRihAnte, kRihAnte};
-    ParsedRounds parsed = parse_rounds(state);
-    apply_round_contributions(parsed.round(0), kRihRound1Bet, contributions);
-    if (parsed.board_cards_dealt >= 1)
-        apply_round_contributions(parsed.round(1), kRihRound2Bet,
-                                  contributions);
-    if (parsed.board_cards_dealt >= 2)
-        apply_round_contributions(parsed.round(2), kRihRound3Bet,
-                                  contributions);
-    return contributions;
+    return {state.contribution[0], state.contribution[1]};
 }
 
 namespace {
 
-// Winner by three-card hand rank over hole card plus board, or std::nullopt on
-// a tie.
+// Winner from the ranks stored when the turn was dealt, or
+// std::nullopt on a tie.
 std::optional<Player> showdown_winner(const State& state) {
+    if (state.showdown_rank[0] == state.showdown_rank[1]) return std::nullopt;
+    return state.showdown_rank[0] > state.showdown_rank[1] ? 0 : 1;
+}
+
+// Both players' three-card ranks, stored once when the turn card
+// arrives. Later showdowns of this deal read the fields.
+void remember_showdown_ranks(State& state) {
     std::array<Card, 3> hand0 = {static_cast<Card>(state.hole_cards[0]),
                                  static_cast<Card>(state.board_cards[0]),
                                  static_cast<Card>(state.board_cards[1])};
     std::array<Card, 3> hand1 = {static_cast<Card>(state.hole_cards[1]),
                                  static_cast<Card>(state.board_cards[0]),
                                  static_cast<Card>(state.board_cards[1])};
-    cfr::eval::HandRank rank0 = cfr::eval::evaluate_3card(hand0.data());
-    cfr::eval::HandRank rank1 = cfr::eval::evaluate_3card(hand1.data());
-    if (rank0 == rank1) return std::nullopt;
-    return rank0 > rank1 ? 0 : 1;
+    state.showdown_rank[0] = cfr::eval::evaluate_3card(hand0.data());
+    state.showdown_rank[1] = cfr::eval::evaluate_3card(hand1.data());
 }
 
 // Number of round_progress values in one round.
@@ -156,51 +152,62 @@ const SuitCanonicalTables& canonical_tables() {
 
 }
 
-// A default State: no cards and an empty history.
+// Antes are posted before any card is dealt.
 State RhodeIslandGame::initial_state() const {
-    return State{};
+    State state;
+    state.contribution[0] = kRihAnte;
+    state.contribution[1] = kRihAnte;
+    return state;
 }
 
 // True while a hole card is missing, or when a round has closed
 // and fewer than two board cards are out.
 bool RhodeIslandGame::is_chance(const State& state) const {
     if (state.hole_cards[0] == -1 || state.hole_cards[1] == -1) return true;
-    ParsedRounds parsed = parse_rounds(state);
-    if (parsed.board_cards_dealt >= 2) return false;
-    return round_closed(active_round_actions(parsed));
+    if (state.board_count >= 2) return false;
+    return round_closed(state);
 }
 
 // A fold ends the hand in any round; otherwise it ends when
 // round 3 closes.
 bool RhodeIslandGame::is_terminal(const State& state) const {
     if (is_chance(state)) return false;
-    ParsedRounds parsed = parse_rounds(state);
-    std::span<const Action> active = active_round_actions(parsed);
-    if (parsed.board_cards_dealt < 2) return folded(active);
-    return folded(active) || round_closed(active);
+    if (state.board_count < 2) return folded(state);
+    return folded(state) || round_closed(state);
 }
 
 // Player to act in the active round.
 Player RhodeIslandGame::current_player(const State& state) const {
     assert(!is_chance(state) && !is_terminal(state));
-    ParsedRounds parsed = parse_rounds(state);
-    return round_acting_player(active_round_actions(parsed));
+    return static_cast<std::size_t>(state.round_len) % kPlayerCount;
 }
 
 // Legal actions of the active round under the raise cap.
-std::vector<Action> RhodeIslandGame::legal_actions(const State& state) const {
-    ParsedRounds parsed = parse_rounds(state);
-    return round_legal_actions(active_round_actions(parsed),
-                               kRihMaxRaisesPerRound);
+FixedVector<Action, RhodeIslandGame::kMaxActions>
+RhodeIslandGame::legal_actions(const State& state) const {
+    return round_legal_actions<kMaxActions>(state, kRihMaxRaisesPerRound);
 }
 
-// Appends the entry, and at a chance node also stores the card
-// decoded from action - kChanceCardOffset.
+// Fixed bet of the round now in progress.
+int bet_size_of(const State& state) {
+    if (state.board_count == 0) return kRihRound1Bet;
+    if (state.board_count == 1) return kRihRound2Bet;
+    return kRihRound3Bet;
+}
+
+// Appends the entry. A dealt card is stored, and a board card opens
+// the next round. The turn card also stores both showdown ranks.
+// A betting action updates the round and the pot.
 State RhodeIslandGame::apply_action(const State& state, Action action) const {
     State next = state;
     bool dealing = is_chance(state);
     append_action(next, action);
-    if (dealing) deal_card(next, action - kChanceCardOffset);
+    if (dealing) {
+        deal_and_advance(next, action - kChanceCardOffset);
+        if (next.board_count == 2) remember_showdown_ranks(next);
+        return next;
+    }
+    apply_betting_action(next, action, bet_size_of(next));
     return next;
 }
 
@@ -209,14 +216,11 @@ State RhodeIslandGame::apply_action(const State& state, Action action) const {
 double RhodeIslandGame::terminal_utility(const State& state,
                                          Player player) const {
     std::array<int, 2> contributions = rih_contributions(state);
-    ParsedRounds parsed = parse_rounds(state);
-    std::span<const Action> final_round = active_round_actions(parsed);
-
-    if (folded(final_round)) {
-        Player folder = (final_round.size() - 1) % kPlayerCount;
+    if (folded(state)) {
+        Player folder =
+            (static_cast<std::size_t>(state.round_len) - 1) % kPlayerCount;
         return settle(contributions, opponent(folder), player);
     }
-
     return settle(contributions, showdown_winner(state), player);
 }
 
@@ -303,7 +307,7 @@ std::uint32_t RhodeIslandGame::infoset_index(const State& state) const {
 }
 
 // Uniform over the undealt cards of the deck.
-std::vector<ChanceOutcome> RhodeIslandGame::chance_outcomes(
+FixedVector<ChanceOutcome, kMaxChanceOutcomes> RhodeIslandGame::chance_outcomes(
     const State& state) const {
     return deal_outcomes(state, kCardCount);
 }

@@ -40,7 +40,7 @@ void collect_strategy_profile(const GameT& game, const game::State& state,
         return;
     }
 
-    std::vector<game::Action> actions = game.legal_actions(state);
+    auto actions = game.legal_actions(state);
     std::span<const double> stored(
         stored_table.data() + game.infoset_index(state) * stride,
         actions.size());
@@ -172,7 +172,7 @@ std::array<double, 2> CfrSolver<Rules, GameT>::traverse(
 
     game::Player acting_player = game_.current_player(state);
     std::uint32_t infoset_index = game_.infoset_index(state);
-    std::vector<game::Action> actions = game_.legal_actions(state);
+    auto actions = game_.legal_actions(state);
     assert(actions.size() <= detail::kMaxActionsPerInfoset);
 
     std::size_t table_offset =

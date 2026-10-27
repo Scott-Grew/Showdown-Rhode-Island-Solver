@@ -66,60 +66,57 @@ bool board_card_dealt(const ParsedRounds& parsed) {
 
 // Ante plus the bets of each round played so far.
 std::array<int, 2> leduc_contributions(const State& state) {
-    std::array<int, 2> contributions = {kLeducAnte, kLeducAnte};
-    ParsedRounds parsed = parse_rounds(state);
-    apply_round_contributions(parsed.round(0), kLeducRound1Bet, contributions);
-    if (board_card_dealt(parsed)) {
-        apply_round_contributions(parsed.round(1), kLeducRound2Bet,
-                                  contributions);
-    }
-    return contributions;
+    return {state.contribution[0], state.contribution[1]};
 }
 
-// A default State: no cards and an empty history.
+// Antes are posted before any card is dealt.
 State LeducGame::initial_state() const {
-    return State{};
+    State state;
+    state.contribution[0] = kLeducAnte;
+    state.contribution[1] = kLeducAnte;
+    return state;
 }
 
 // True while a hole card is missing, or when round 1 has closed
 // and the board card is not out yet.
 bool LeducGame::is_chance(const State& state) const {
     if (state.hole_cards[0] == -1 || state.hole_cards[1] == -1) return true;
-    ParsedRounds parsed = parse_rounds(state);
-    if (board_card_dealt(parsed)) return false;
-    return round_closed(parsed.round(0));
+    if (state.board_count >= 1) return false;
+    return round_closed(state);
 }
 
 // A fold ends the hand in either round; otherwise it ends when
 // round 2 closes.
 bool LeducGame::is_terminal(const State& state) const {
     if (is_chance(state)) return false;
-    ParsedRounds parsed = parse_rounds(state);
-    if (!board_card_dealt(parsed)) return folded(parsed.round(0));
-    return folded(parsed.round(1)) || round_closed(parsed.round(1));
+    if (state.board_count < 1) return folded(state);
+    return folded(state) || round_closed(state);
 }
 
 // Player to act in the active round.
 Player LeducGame::current_player(const State& state) const {
     assert(!is_chance(state) && !is_terminal(state));
-    ParsedRounds parsed = parse_rounds(state);
-    return round_acting_player(active_round_actions(parsed));
+    return static_cast<std::size_t>(state.round_len) % kPlayerCount;
 }
 
 // Legal actions of the active round under the raise cap.
-std::vector<Action> LeducGame::legal_actions(const State& state) const {
-    ParsedRounds parsed = parse_rounds(state);
-    return round_legal_actions(active_round_actions(parsed),
-                               kLeducMaxRaisesPerRound);
+FixedVector<Action, LeducGame::kMaxActions> LeducGame::legal_actions(
+    const State& state) const {
+    return round_legal_actions<kMaxActions>(state, kLeducMaxRaisesPerRound);
 }
 
-// Appends the entry, and at a chance node also stores the card
-// decoded from action - kChanceCardOffset.
+// Appends the entry. A dealt card is stored, and a board card opens
+// the next round. A betting action updates the round and the pot.
 State LeducGame::apply_action(const State& state, Action action) const {
     State next = state;
     bool dealing = is_chance(state);
     append_action(next, action);
-    if (dealing) deal_card(next, action - kChanceCardOffset);
+    if (dealing) {
+        deal_and_advance(next, action - kChanceCardOffset);
+        return next;
+    }
+    int bet_size = next.board_count == 0 ? kLeducRound1Bet : kLeducRound2Bet;
+    apply_betting_action(next, action, bet_size);
     return next;
 }
 
@@ -127,14 +124,11 @@ State LeducGame::apply_action(const State& state, Action action) const {
 // decides, and a tie pays zero.
 double LeducGame::terminal_utility(const State& state, Player player) const {
     std::array<int, 2> contributions = leduc_contributions(state);
-    ParsedRounds parsed = parse_rounds(state);
-    std::span<const Action> final_round = active_round_actions(parsed);
-
-    if (folded(final_round)) {
-        Player folder = (final_round.size() - 1) % kPlayerCount;
+    if (folded(state)) {
+        Player folder =
+            (static_cast<std::size_t>(state.round_len) - 1) % kPlayerCount;
         return settle(contributions, opponent(folder), player);
     }
-
     return settle(contributions, showdown_winner(state), player);
 }
 
@@ -192,7 +186,7 @@ std::uint32_t LeducGame::infoset_index(const State& state) const {
 }
 
 // Uniform over the undealt cards of the six-card deck.
-std::vector<ChanceOutcome> LeducGame::chance_outcomes(
+FixedVector<ChanceOutcome, kMaxChanceOutcomes> LeducGame::chance_outcomes(
     const State& state) const {
     return deal_outcomes(state, kLeducDeckSize);
 }

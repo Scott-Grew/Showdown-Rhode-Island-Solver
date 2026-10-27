@@ -250,17 +250,19 @@ private:
         return distribution.size() - 1;
     }
 
-    // Samples one outcome of a chance node by its probability.
+    // One chance outcome. The probabilities are copied onto the
+    // stack and drawn by sample_index, the only copy of the
+    // arithmetic the checkpoint depends on.
     game::Action sample_chance_action(const game::State& state,
                                       TraversalContext& context) const {
-        std::vector<game::ChanceOutcome> outcomes =
-            game_.chance_outcomes(state);
-        std::vector<double> probabilities(outcomes.size());
-        for (std::size_t i = 0; i < outcomes.size(); ++i) {
+        auto outcomes = game_.chance_outcomes(state);
+        std::array<double, game::kMaxChanceOutcomes> probabilities;
+        for (std::size_t i = 0; i < outcomes.size(); ++i)
             probabilities[i] = outcomes[i].probability;
-        }
-        return outcomes[sample_index(probabilities, context.random_engine)]
-            .action;
+        std::size_t sampled = sample_index(
+            std::span<const double>(probabilities.data(), outcomes.size()),
+            context.random_engine);
+        return outcomes[sampled].action;
     }
 
     // Regret-matching strategy of one infoset, read from the live
@@ -289,7 +291,7 @@ private:
         }
 
         game::Player acting_player = game_.current_player(state);
-        std::vector<game::Action> actions = game_.legal_actions(state);
+        auto actions = game_.legal_actions(state);
         assert(actions.size() <= detail::kMaxActionsPerInfoset);
 
         std::size_t table_offset =

@@ -5,12 +5,13 @@
 #pragma once
 
 #include <array>
+#include <cassert>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace cfr::game {
 
@@ -24,19 +25,77 @@ constexpr Player opponent(Player player) {
     return kPlayerCount - 1 - player;
 }
 
-// Fixed capacities of the State arrays below.
+// Fixed capacities of the State arrays below. A betting round holds
+// at most eight actions, and every game here deals from at most 52
+// cards.
 inline constexpr std::size_t kMaxHistory = 32;
 inline constexpr std::size_t kMaxBoardCards = 2;
+inline constexpr std::size_t kMaxActionsPerRound = 8;
+inline constexpr std::size_t kMaxChanceOutcomes = 52;
+
+// Stack sequence with a compile-time cap. Traversal returns these
+// instead of allocating a std::vector.
+template <typename T, std::size_t N>
+class FixedVector {
+public:
+    FixedVector() = default;
+
+    FixedVector(std::initializer_list<T> items) {
+        assert(items.size() <= N);
+        for (const T& item : items) push_back(item);
+    }
+
+    void push_back(const T& item) {
+        assert(size_ < N);
+        data_[size_++] = item;
+    }
+
+    std::size_t size() const { return size_; }
+    bool empty() const { return size_ == 0; }
+    T& operator[](std::size_t index) { return data_[index]; }
+    const T& operator[](std::size_t index) const { return data_[index]; }
+    T* begin() { return data_.data(); }
+    const T* begin() const { return data_.data(); }
+    T* end() { return data_.data() + size_; }
+    const T* end() const { return data_.data() + size_; }
+
+    bool operator==(const FixedVector& other) const {
+        if (size_ != other.size_) return false;
+        for (std::size_t index = 0; index < size_; ++index)
+            if (!(data_[index] == other.data_[index])) return false;
+        return true;
+    }
+
+private:
+    std::array<T, N> data_{};
+    std::size_t size_ = 0;
+};
 
 // One node of a game tree. A card entry of -1 means not dealt yet,
 // and history holds chance and betting entries in play order.
+//
+// The fields after history are the betting round in progress.
+// Leduc and Rhode Island update them in O(1) from apply_action;
+// Kuhn leaves them at the defaults. The active round's actions
+// are history's last round_len entries. contribution includes
+// the ante. showdown_rank is filled when Rhode Island deals the
+// turn. round_contribution and level_to_match are the running
+// pot of the active round.
 struct State {
     std::array<std::int8_t, 2> hole_cards{-1, -1};
     std::array<std::int8_t, kMaxBoardCards> board_cards{-1, -1};
     std::uint8_t board_count = 0;
     std::array<std::uint8_t, kMaxHistory> history{};
     std::uint8_t history_len = 0;
+    std::uint8_t round_len = 0;
+    std::uint8_t raises_used = 0;
+    std::array<int, 2> contribution{};
+    std::array<int, 2> round_contribution{};
+    int level_to_match = 0;
+    std::array<std::uint16_t, 2> showdown_rank{};
 };
+
+static_assert(sizeof(State) <= 64, "State must stay a cheap copy");
 
 // One branch of a chance node: the
 // dealing action and how likely it is.
@@ -55,12 +114,16 @@ concept GameLike = requires(const CandidateGame game, const State state,
     { game.is_terminal(state) } -> std::same_as<bool>;
     { game.is_chance(state) } -> std::same_as<bool>;
     { game.current_player(state) } -> std::same_as<Player>;
-    { game.legal_actions(state) } -> std::same_as<std::vector<Action>>;
+    {
+        game.legal_actions(state)
+    } -> std::same_as<FixedVector<Action, CandidateGame::kMaxActions>>;
     { game.apply_action(state, action) } -> std::same_as<State>;
     { game.terminal_utility(state, player) } -> std::same_as<double>;
     { game.infoset_index(state) } -> std::same_as<std::uint32_t>;
     { game.infoset_count() } -> std::same_as<std::uint32_t>;
-    { game.chance_outcomes(state) } -> std::same_as<std::vector<ChanceOutcome>>;
+    {
+        game.chance_outcomes(state)
+    } -> std::same_as<FixedVector<ChanceOutcome, kMaxChanceOutcomes>>;
     { CandidateGame::kMaxActions } -> std::convertible_to<std::size_t>;
 };
 

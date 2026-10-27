@@ -57,7 +57,7 @@ void show_table(const State& state, bool reveal_solver_hole) {
 // Reads a legal move by name from stdin; end of input returns a
 // fold and leaves std::cin failed.
 Action ask_human(const RhodeIslandGame& game, const State& state) {
-    std::vector<Action> actions = game.legal_actions(state);
+    auto actions = game.legal_actions(state);
     while (true) {
         std::cout << "  your move [";
         for (std::size_t i = 0; i < actions.size(); ++i) {
@@ -88,7 +88,7 @@ using ActionProbabilities =
 Action solver_move(const RhodeIslandGame& game, const State& state,
                    const ActionProbabilities& strategy,
                    std::mt19937_64& random_engine) {
-    std::vector<Action> actions = game.legal_actions(state);
+    auto actions = game.legal_actions(state);
     std::vector<double> probabilities = strategy(state, actions.size());
     double roll =
         std::uniform_real_distribution<double>(0.0, 1.0)(random_engine);
@@ -97,7 +97,7 @@ Action solver_move(const RhodeIslandGame& game, const State& state,
         cumulative += probabilities[i];
         if (roll < cumulative) return actions[i];
     }
-    return actions.back();
+    return actions[actions.size() - 1];
 }
 
 // Deals and plays one hand from a shuffled deck. Returns the chips

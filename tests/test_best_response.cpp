@@ -37,7 +37,7 @@ StrategyProfile pure_action_profile(const GameT& game, Player player,
     walk(game, game.initial_state(), [&](const State& state) {
         if (game.is_terminal(state) || game.is_chance(state)) return;
         if (game.current_player(state) != player) return;
-        std::vector<Action> actions = game.legal_actions(state);
+        auto actions = game.legal_actions(state);
         std::vector<double> strategy(actions.size(), 0.0);
         strategy[use_last_action ? actions.size() - 1 : 0] = 1.0;
         profile[game.infoset_label(state)] = strategy;
@@ -59,7 +59,7 @@ double expected_value(const GameT& game, const StrategyProfile& profile,
         return value;
     }
 
-    std::vector<Action> actions = game.legal_actions(state);
+    auto actions = game.legal_actions(state);
     auto profile_entry = profile.find(game.infoset_label(state));
     double uniform_probability = 1.0 / static_cast<double>(actions.size());
 

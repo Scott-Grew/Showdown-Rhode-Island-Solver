@@ -4,13 +4,10 @@
 
 #pragma once
 
-#include <cstddef>
-
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string>
-#include <utility>
-#include <vector>
 
 #include "game/betting_round.hpp"
 #include "game/card.hpp"
@@ -46,7 +43,7 @@ public:
     // Player to act at a decision node.
     Player current_player(const State& state) const;
     // Legal actions at a decision node, in table column order.
-    std::vector<Action> legal_actions(const State& state) const;
+    FixedVector<Action, kMaxActions> legal_actions(const State& state) const;
     // Returns the state after a betting action or a dealt card.
     State apply_action(const State& state, Action action) const;
     // Chips won by player at a terminal state; the game is zero-sum.
@@ -59,7 +56,8 @@ public:
     // Dense row of the acting player's infoset, below infoset_count.
     std::uint32_t infoset_index(const State& state) const;
     // Each possible deal at a chance node with its probability.
-    std::vector<ChanceOutcome> chance_outcomes(const State& state) const;
+    FixedVector<ChanceOutcome, kMaxChanceOutcomes> chance_outcomes(
+        const State& state) const;
 };
 
 }

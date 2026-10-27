@@ -34,11 +34,10 @@ using BestResponseMemo = std::map<game::InfosetLabel, double>;
 
 // The opponent's strategy at state, or uniform when the profile
 // has no entry for that infoset.
-template <typename GameT>
+template <typename GameT, typename Actions>
 std::vector<double> opponent_action_probabilities(
     const GameT& game, const game::State& state,
-    const StrategyProfile& opponent_strategy,
-    const std::vector<game::Action>& actions) {
+    const StrategyProfile& opponent_strategy, const Actions& actions) {
     auto profile_entry = opponent_strategy.find(game.infoset_label(state));
 
     if (profile_entry != opponent_strategy.end()) {
@@ -72,7 +71,7 @@ void collect_responder_states(const GameT& game, const game::State& state,
         return;
     }
 
-    std::vector<game::Action> actions = game.legal_actions(state);
+    auto actions = game.legal_actions(state);
 
     if (game.current_player(state) == responder) {
         states_by_infoset[game.infoset_label(state)].push_back(
@@ -118,8 +117,7 @@ double best_response_value_at(const GameT& game,
 
     const std::vector<WeightedState>& weighted_states =
         states_by_infoset.at(infoset_label);
-    std::vector<game::Action> actions =
-        game.legal_actions(weighted_states.front().state);
+    auto actions = game.legal_actions(weighted_states.front().state);
     std::vector<double> action_totals(actions.size(), 0.0);
     double total_reach_weight = 0.0;
 
@@ -172,7 +170,7 @@ double node_value(const GameT& game, const game::State& state,
                                       states_by_infoset, memo);
     }
 
-    std::vector<game::Action> actions = game.legal_actions(state);
+    auto actions = game.legal_actions(state);
     std::vector<double> action_probabilities =
         opponent_action_probabilities(game, state, opponent_strategy, actions);
 

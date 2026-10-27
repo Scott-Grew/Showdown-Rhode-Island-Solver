@@ -121,7 +121,7 @@ TEST_CASE("leduc: raise cap enforced at 2 per round") {
     state = game.apply_action(state, kActionRaise);
 
     REQUIRE_FALSE(game.is_terminal(state));
-    std::vector<Action> legal = game.legal_actions(state);
+    auto legal = game.legal_actions(state);
     REQUIRE(std::find(legal.begin(), legal.end(), kActionRaise) == legal.end());
     REQUIRE(std::find(legal.begin(), legal.end(), kActionFold) != legal.end());
     REQUIRE(std::find(legal.begin(), legal.end(), kActionCallCheck) !=

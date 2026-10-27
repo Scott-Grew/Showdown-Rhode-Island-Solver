@@ -5,10 +5,7 @@
 #pragma once
 
 #include <cstddef>
-
 #include <cstdint>
-#include <utility>
-#include <vector>
 
 #include "game/game.hpp"
 
@@ -42,7 +39,7 @@ public:
     // Player to act at a decision node.
     Player current_player(const State& state) const;
     // Legal actions at a decision node, in table column order.
-    std::vector<Action> legal_actions(const State& state) const;
+    FixedVector<Action, kMaxActions> legal_actions(const State& state) const;
     // Returns the state after a betting action or a dealt card.
     State apply_action(const State& state, Action action) const;
     // Chips won by player at a terminal state; the game is zero-sum.
@@ -55,18 +52,24 @@ public:
     // Dense row of the acting player's infoset, below infoset_count.
     std::uint32_t infoset_index(const State& state) const;
     // Each possible deal at a chance node with its probability.
-    std::vector<ChanceOutcome> chance_outcomes(const State& state) const;
+    FixedVector<ChanceOutcome, kMaxChanceOutcomes> chance_outcomes(
+        const State& state) const;
 
 private:
+    // One full Kuhn hand ends in at most three betting actions.
+    static constexpr std::size_t kMaxBettingActions = 3;
+
     // The history without its two leading card entries.
-    static std::vector<Action> betting_history(const State& state);
+    static FixedVector<Action, kMaxBettingActions> betting_history(
+        const State& state);
 
     // Chips won by player 0 at a terminal state.
     static double player0_utility(const State& state);
 
     // Decision point reached by the betting: 0 opening, 1 after a
     // check, 2 after a bet, 3 after check then bet.
-    static int betting_progress(const std::vector<Action>& betting);
+    static int betting_progress(
+        const FixedVector<Action, kMaxBettingActions>& betting);
 };
 
 }
