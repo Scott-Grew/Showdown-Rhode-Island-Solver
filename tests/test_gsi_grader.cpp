@@ -18,14 +18,6 @@ using namespace cfr::game;
 
 namespace {
 
-cfr::solver::RihStrategyQuery query_for(const GsiStrategy& strategy) {
-    return [&strategy](const State& state, Player acting_player,
-                       std::vector<double>& probabilities_by_card) {
-        strategy.action_probabilities_by_card(state, acting_player,
-                                              probabilities_by_card);
-    };
-}
-
 cfr::solver::RihStrategyQuery player0_bets_only_in_round(int target_round) {
     return [target_round](const State& state, Player acting_player,
                           std::vector<double>& probabilities) {
@@ -65,7 +57,8 @@ TEST_CASE("rhode island walk conserves value between the two players") {
     GsiStrategy strategy = GsiStrategy::load(CFR_GSI_DATA_DIR);
     INFO("GSI equilibrium data absent; run `make data/gsi/partition`");
     REQUIRE(strategy.available());
-    cfr::solver::RihStrategyQuery query = query_for(strategy);
+    cfr::solver::RihStrategyQuery query =
+        cfr::grader::gsi_strategy_query(strategy);
     REQUIRE_THAT(cfr::solver::rih_strategy_value(query, 0) +
                      cfr::solver::rih_strategy_value(query, 1),
                  WithinAbs(0.0, 1e-9));
@@ -76,7 +69,8 @@ TEST_CASE(
     GsiStrategy strategy = GsiStrategy::load(CFR_GSI_DATA_DIR);
     INFO("GSI equilibrium data absent; run `make data/gsi/partition`");
     REQUIRE(strategy.available());
-    cfr::solver::RihStrategyQuery query = query_for(strategy);
+    cfr::solver::RihStrategyQuery query =
+        cfr::grader::gsi_strategy_query(strategy);
 
     for (Player player = 0; player < kPlayerCount; ++player) {
         double follow = cfr::solver::rih_strategy_value(query, player);
@@ -84,4 +78,15 @@ TEST_CASE(
             cfr::solver::rih_best_response_value_in_round(query, player, 0);
         REQUIRE_THAT(deviate - follow, WithinAbs(0.0, 1e-5));
     }
+}
+
+// Pins the number cfr_measure --published prints. A change in the
+// best-response walk moves this value.
+TEST_CASE("published equilibrium exploitability is the measured value") {
+    GsiStrategy strategy = GsiStrategy::load(CFR_GSI_DATA_DIR);
+    INFO("GSI equilibrium data absent; run `make data/gsi/partition`");
+    REQUIRE(strategy.available());
+    cfr::solver::RihExploitability report = cfr::solver::rih_exploitability(
+        cfr::grader::gsi_strategy_query(strategy));
+    REQUIRE_THAT(report.exploitability, WithinAbs(0.805328, 1e-6));
 }

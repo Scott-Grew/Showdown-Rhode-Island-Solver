@@ -40,6 +40,25 @@ double rih_best_response_value_in_round(
     const RihStrategyQuery& opponent_strategy, game::Player responder,
     int round);
 
+// Best-response values of both players and their mean, the
+// exploitability, in chips per hand.
+struct RihExploitability {
+    double best_response_player0;
+    double best_response_player1;
+    double exploitability;
+};
+
+// Best response of each player to strategy. The mean of the two
+// is how far strategy is from a Nash equilibrium.
+inline RihExploitability rih_exploitability(const RihStrategyQuery& strategy) {
+    RihExploitability report{};
+    report.best_response_player0 = rih_best_response_value(strategy, 0);
+    report.best_response_player1 = rih_best_response_value(strategy, 1);
+    report.exploitability =
+        (report.best_response_player0 + report.best_response_player1) / 2.0;
+    return report;
+}
+
 // Adapts a solver's average strategy to a RihStrategyQuery. The
 // result holds references to source and game.
 template <typename AverageStrategySource, typename GameT>

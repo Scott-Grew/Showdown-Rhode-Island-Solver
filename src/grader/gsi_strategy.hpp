@@ -14,6 +14,7 @@
 
 #include "game/card.hpp"
 #include "game/game.hpp"
+#include "solver/rih_best_response.hpp"
 
 namespace cfr::grader {
 
@@ -69,5 +70,16 @@ private:
         2>
         strategy_rows_;
 };
+
+// Adapts the published equilibrium to the best-response walk.
+// The result refers to strategy, which must outlive it.
+inline solver::RihStrategyQuery gsi_strategy_query(
+    const GsiStrategy& strategy) {
+    return [&strategy](const game::State& state, game::Player acting_player,
+                       std::vector<double>& probabilities_by_card) {
+        strategy.action_probabilities_by_card(state, acting_player,
+                                              probabilities_by_card);
+    };
+}
 
 }
