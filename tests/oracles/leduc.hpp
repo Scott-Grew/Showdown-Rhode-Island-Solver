@@ -11,7 +11,8 @@
 
 namespace cfr::game {
 
-// Six cards: ranks J, Q, K in two suits. Rank is card / 2.
+// Six card ids local to Leduc (J/Q/K in two suits), not make_card ids.
+// Rank is card / 2.
 constexpr int kLeducDeckSize = 6;
 
 // Stakes in chips: fixed bet per round, raise cap and ante.

@@ -61,10 +61,9 @@ class BestResponseWalk {
 public:
     // deviation_round limits a best response to the round with that
     // many board cards dealt, or is kDeviateInEveryRound.
-    BestResponseWalk(const RihStrategyQuery& opponent_strategy,
-                     Player responder, ResponderPolicy policy,
-                     int deviation_round)
-        : opponent_strategy_(opponent_strategy),
+    BestResponseWalk(const RihStrategyQuery& strategy, Player responder,
+                     ResponderPolicy policy, int deviation_round)
+        : strategy_query_(strategy),
           responder_(responder),
           opponent_(opponent(responder)),
           maximize_(policy == ResponderPolicy::kBestResponse),
@@ -236,7 +235,7 @@ private:
 
         std::vector<double> probabilities_by_card;
         if (!maximize_here)
-            opponent_strategy_(state, responder_, probabilities_by_card);
+            strategy_query_(state, responder_, probabilities_by_card);
 
         for (std::size_t action_index = 0; action_index < actions.size();
              ++action_index) {
@@ -268,7 +267,7 @@ private:
                                 const BoardRanks* ranks) {
         auto actions = game_.legal_actions(state);
         std::vector<double> probabilities_by_card;
-        opponent_strategy_(state, opponent_, probabilities_by_card);
+        strategy_query_(state, opponent_, probabilities_by_card);
 
         RihCardVector value{};
         for (std::size_t action_index = 0; action_index < actions.size();
@@ -293,7 +292,7 @@ private:
     }
 
     RhodeIslandGame game_;
-    const RihStrategyQuery& opponent_strategy_;
+    const RihStrategyQuery& strategy_query_;
     Player responder_;
     Player opponent_;
     bool maximize_;

@@ -71,13 +71,13 @@ NaiveRank naive_evaluate_3card(const Card* cards) {
 
     if (hand.is_straight && hand.is_flush) {
         result.category = 5;
-        result.tiebreak = {hand.straight_high, -1, -1, -1, -1};
+        result.tiebreak = {hand.straight_high, -1, -1};
     } else if (hand.count_rank_pairs[0].first == 3) {
         result.category = 4;
-        result.tiebreak = {hand.count_rank_pairs[0].second, -1, -1, -1, -1};
+        result.tiebreak = {hand.count_rank_pairs[0].second, -1, -1};
     } else if (hand.is_straight) {
         result.category = 3;
-        result.tiebreak = {hand.straight_high, -1, -1, -1, -1};
+        result.tiebreak = {hand.straight_high, -1, -1};
     } else if (hand.is_flush) {
         result.category = 2;
     } else if (hand.count_rank_pairs[0].first == 2) {

@@ -30,12 +30,9 @@ inline constexpr int kGsiSlotsPerKey = 10;
 // from its partition and player files.
 class GsiStrategy {
 public:
-    // Reads partition, player1 and player2 from directory. A missing
-    // or short file yields an object whose available() is false.
+    // Reads partition, player1 and player2 from directory. Missing,
+    // truncated or malformed files throw std::runtime_error.
     static GsiStrategy load(const std::string& directory);
-
-    // True when every file loaded completely.
-    bool available() const { return available_; }
 
     // Strategy of the acting player at
     // state, one entry per legal action.
@@ -63,7 +60,7 @@ private:
     void write_slots(game::Player acting_player, std::uint32_t key,
                      int decision_type, std::span<double> destination) const;
 
-    bool available_ = false;
+    // Index 0 is unused; GSI signal-tree nodes are numbered from 1.
     std::vector<std::uint16_t> signal_class_;
     std::array<
         std::unordered_map<std::uint32_t, std::array<float, kGsiSlotsPerKey>>,

@@ -52,7 +52,8 @@ public:
           seed_(seed) {}
 
     // Runs this many more iterations, split across thread_count
-    // threads; each thread keeps its random engine between calls.
+    // threads. One iteration is one full traversal for each player;
+    // each thread keeps its random engine between calls.
     void run_iterations(int iteration_count, int thread_count = 1) {
         if (iteration_count < 0)
             throw std::invalid_argument(
@@ -89,8 +90,8 @@ public:
     // Iterations completed, including any loaded from a checkpoint.
     int iterations_run() const { return iteration_; }
 
-    // Sum of the whole strategy table; each opponent-node visit adds
-    // a distribution summing to 1.
+    // Sum of every strategy_sums_ entry. Each opponent-node visit adds
+    // one distribution that sums to 1, so this equals opponent_node_visits.
     double strategy_mass() const {
         long double total = 0.0L;
         for (const std::atomic<double>& value : strategy_sums_)
@@ -98,8 +99,8 @@ public:
         return static_cast<double>(total);
     }
 
-    // Opponent decision nodes visited by all workers since
-    // construction. Call only while no run is in flight.
+    // Opponent decision nodes sampled since construction; should match
+    // strategy_mass. Call only while no run is in flight.
     std::uint64_t opponent_node_visits() const {
         std::uint64_t total = 0;
         for (const std::unique_ptr<TraversalContext>& context : contexts_)
@@ -119,8 +120,9 @@ public:
         normalize_or_uniform(strategy.subspan(0, action_count));
     }
 
-    // Binary checkpoint in native layout: uint64 count, int
-    // iterations, then the sums as doubles. Regrets are not saved.
+    // Binary checkpoint, native byte order: uint64 value count, int
+    // iteration count, then that many doubles (strategy sums only;
+    // regrets are not saved).
     void save_strategy_sums(const std::string& path) const {
         std::ofstream output(path, std::ios::binary);
         if (!output)
@@ -231,10 +233,9 @@ private:
         return distribution.size() - 1;
     }
 
-    // One chance outcome. Games that can map the roll onto a card
-    // do so; the roll is the same distribution sample_index draws,
-    // so the checkpoint stays byte-identical. The others still sum
-    // chance_outcomes, which is the arithmetic Kuhn and Leduc use.
+    // Optional fast path: games may map the roll to a card directly.
+    // It must pick the same card as sample_index would, or checkpoints
+    // diverge. Otherwise chance_outcomes plus sample_index is used.
     game::Action sample_chance_action(const game::State& state,
                                       TraversalContext& context) const {
         if constexpr (requires(double roll) {

@@ -11,7 +11,7 @@ namespace cfr::eval::naive {
 
 struct NaiveRank {
     int category = 0;
-    std::array<int, 5> tiebreak = {-1, -1, -1, -1, -1};
+    std::array<int, 3> tiebreak = {-1, -1, -1};
 
     bool operator==(const NaiveRank& other) const {
         return category == other.category && tiebreak == other.tiebreak;

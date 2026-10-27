@@ -58,7 +58,7 @@ data/gsi/partition:
 	cp "$$tmp_dir/player2" data/gsi/player2
 
 verify-discovery: build
-	@declared=$$(grep -rhc '^TEST_CASE(' tests/*.cpp | paste -sd+ - | bc); \
+	@declared=$$(grep -rh '^TEST_CASE(' tests/*.cpp | wc -l | tr -d ' '); \
 	discovered=$$(ctest --test-dir $(RELEASE_DIR) -N | tail -1 | awk '{print $$3}'); \
 	if [ "$$declared" != "$$discovered" ]; then \
 		echo "test discovery mismatch: $$declared TEST_CASE macros, $$discovered ctest entries"; \

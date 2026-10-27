@@ -1,7 +1,8 @@
 // Best response for Rhode Island. It walks the public tree once with
 // a value per hole card instead of visiting each deal, and reads
 // strategies through the RihStrategyQuery callback so it can grade
-// ours or the published one.
+// ours or the published one. Every value is in chips per hand,
+// averaged over all ordered deals of two hole and two board cards.
 
 #pragma once
 
@@ -31,7 +32,7 @@ using RihStrategyQuery =
 double rih_best_response_value(const RihStrategyQuery& opponent_strategy,
                                game::Player responder);
 
-// Expected chips per hand for player when both sides follow profile.
+// Expected chips per hand for player when both seats play profile.
 double rih_strategy_value(const RihStrategyQuery& profile, game::Player player);
 
 // As rih_best_response_value, but the responder may deviate
@@ -41,15 +42,15 @@ double rih_best_response_value_in_round(
     int round);
 
 // Best-response values of both players and their mean, the
-// exploitability, in chips per hand.
+// exploitability.
 struct RihExploitability {
     double best_response_player0;
     double best_response_player1;
     double exploitability;
 };
 
-// Best response of each player to strategy. The mean of the two
-// is how far strategy is from a Nash equilibrium.
+// Best response of each player when both seats play strategy. The
+// mean of the two is how far strategy is from a Nash equilibrium.
 inline RihExploitability rih_exploitability(const RihStrategyQuery& strategy) {
     RihExploitability report{};
     report.best_response_player0 = rih_best_response_value(strategy, 0);

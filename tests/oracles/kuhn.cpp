@@ -86,10 +86,11 @@ FixedVector<Action, KuhnGame::kMaxActions> KuhnGame::legal_actions(
 State KuhnGame::apply_action(const State& state, Action action) const {
     State next = state;
     if (is_chance(state)) {
+        int card = action - kChanceCardOffset;
         if (next.hole_cards[0] == -1) {
-            next.hole_cards[0] = static_cast<std::int8_t>(action);
+            next.hole_cards[0] = static_cast<std::int8_t>(card);
         } else {
-            next.hole_cards[1] = static_cast<std::int8_t>(action);
+            next.hole_cards[1] = static_cast<std::int8_t>(card);
         }
         next.history[next.history_len++] = static_cast<std::uint8_t>(action);
         return next;
@@ -164,14 +165,15 @@ FixedVector<ChanceOutcome, kMaxChanceOutcomes> KuhnGame::chance_outcomes(
     FixedVector<ChanceOutcome, kMaxChanceOutcomes> outcomes;
     if (state.hole_cards[0] == -1) {
         for (int card = 0; card < kKuhnDeckSize; ++card) {
-            outcomes.push_back({card, 1.0 / kKuhnDeckSize});
+            outcomes.push_back({kChanceCardOffset + card, 1.0 / kKuhnDeckSize});
         }
         return outcomes;
     }
 
     for (int card = 0; card < kKuhnDeckSize; ++card) {
         if (card != state.hole_cards[0]) {
-            outcomes.push_back({card, 1.0 / (kKuhnDeckSize - 1)});
+            outcomes.push_back(
+                {kChanceCardOffset + card, 1.0 / (kKuhnDeckSize - 1)});
         }
     }
     return outcomes;

@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 
 #include "game/game.hpp"
@@ -22,6 +23,10 @@ constexpr Action kActionRaise = 2;
 // A history entry of kChanceCardOffset + card is a dealt card; any
 // entry below the offset is a betting action.
 constexpr Action kChanceCardOffset = 100;
+static_assert(
+    kChanceCardOffset + static_cast<Action>(kMaxChanceOutcomes) - 1 <=
+        std::numeric_limits<decltype(State::history)::value_type>::max(),
+    "State::history must hold every chance action");
 
 constexpr int round_progress_count(int max_raises) {
     return 2 * max_raises + 2;

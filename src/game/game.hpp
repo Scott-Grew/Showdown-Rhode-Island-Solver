@@ -1,6 +1,6 @@
-// The State all three games share and the GameLike concept the
-// solvers are written against. Kuhn, Leduc and Rhode Island implement
-// it; nothing here knows a specific game.
+// The State all games share and the GameLike concept the solvers
+// are written against. Rhode Island is the product in src/; Kuhn and
+// Leduc are test oracles in tests/oracles/.
 
 #pragma once
 

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cassert>
 #include <fstream>
+#include <stdexcept>
 
 #include "game/card.hpp"
 #include "game/rhode_island.hpp"
@@ -45,7 +46,8 @@ struct SlotRange {
 constexpr std::array<SlotRange, 4> kSlotRanges = {
     SlotRange{0, 2}, {2, 5}, {5, 8}, {8, 10}};
 
-// GSI numbers cards suit-major: suit * 13 + rank.
+// GSI numbers cards suit-major, suit * 13 + rank; ours are rank-major.
+// The ace of suit 0 is 12 in GSI and 48 here.
 int gsi_card(Card card) {
     return card_suit(card) * kRankCount + card_rank(card);
 }
@@ -171,47 +173,64 @@ void GsiStrategy::write_slots(game::Player acting_player, std::uint32_t key,
 GsiStrategy GsiStrategy::load(const std::string& directory) {
     GsiStrategy strategy;
 
-    std::ifstream partition_file(directory + "/partition");
-    if (!partition_file) return strategy;
+    const std::string partition_path = directory + "/partition";
+    std::ifstream partition_file(partition_path);
+    if (!partition_file) {
+        throw std::runtime_error("gsi: could not open '" + partition_path +
+                                 "'; run `make data/gsi/partition`");
+    }
 
+    auto next_class = [&] {
+        int class_id = 0;
+        if (!(partition_file >> class_id)) {
+            throw std::runtime_error("gsi: truncated partition file '" +
+                                     partition_path + "'");
+        }
+        return static_cast<std::uint16_t>(class_id);
+    };
     strategy.signal_class_.assign(kGsiSignalNodeCount + 1, 0);
     for (int hole = 0; hole < kCardCount; ++hole) {
-        int class_id = 0;
-        if (!(partition_file >> class_id)) return strategy;
         strategy.signal_class_[static_cast<std::size_t>(signal_index(hole))] =
-            static_cast<std::uint16_t>(class_id);
+            next_class();
         for (int board0 = 0; board0 < kCardCount; ++board0) {
             if (board0 == hole) continue;
-            if (!(partition_file >> class_id)) return strategy;
-            strategy.signal_class_[static_cast<std::size_t>(signal_index(
-                hole, board0))] = static_cast<std::uint16_t>(class_id);
+            strategy.signal_class_[static_cast<std::size_t>(
+                signal_index(hole, board0))] = next_class();
             for (int board1 = 0; board1 < kCardCount; ++board1) {
                 if (board1 == hole || board1 == board0) continue;
-                if (!(partition_file >> class_id)) return strategy;
                 strategy.signal_class_[static_cast<std::size_t>(
-                    signal_index(hole, board0, board1))] =
-                    static_cast<std::uint16_t>(class_id);
+                    signal_index(hole, board0, board1))] = next_class();
             }
         }
     }
 
     static const char* const kPlayerFiles[] = {"/player1", "/player2"};
     for (int player = 0; player < 2; ++player) {
-        std::ifstream player_file(directory + kPlayerFiles[player]);
-        if (!player_file) return strategy;
+        const std::string player_path = directory + kPlayerFiles[player];
+        std::ifstream player_file(player_path);
+        if (!player_file) {
+            throw std::runtime_error("gsi: could not open '" + player_path +
+                                     "'; run `make data/gsi/partition`");
+        }
         std::uint32_t key = 0;
         while (player_file >> key) {
             std::array<float, kGsiSlotsPerKey> slots{};
             for (int slot = 0; slot < kGsiSlotsPerKey; ++slot) {
-                if (!(player_file >> slots[static_cast<std::size_t>(slot)]))
-                    return strategy;
+                if (!(player_file >> slots[static_cast<std::size_t>(slot)])) {
+                    throw std::runtime_error(
+                        "gsi: truncated or malformed row in '" + player_path +
+                        "' at key " + std::to_string(key));
+                }
             }
             strategy.strategy_rows_[static_cast<std::size_t>(player)].emplace(
                 key, slots);
         }
+        if (!player_file.eof()) {
+            throw std::runtime_error("gsi: malformed row in '" + player_path +
+                                     "'");
+        }
     }
 
-    strategy.available_ = true;
     return strategy;
 }
 
@@ -231,7 +250,6 @@ std::vector<double> GsiStrategy::action_probabilities(
 }
 
 std::uint16_t GsiStrategy::signal_class(std::span<const Card> own_cards) const {
-    assert(available_);
     assert(own_cards.size() >= 1 && own_cards.size() <= 3);
     int hole = gsi_card(own_cards[0]);
     if (own_cards.size() == 1) {

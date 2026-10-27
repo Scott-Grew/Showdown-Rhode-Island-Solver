@@ -3,7 +3,7 @@
 
 #include <cmath>
 #include <cstdint>
-#include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <set>
 #include <vector>
@@ -101,10 +101,11 @@ TEST_CASE("load_strategy_sums rejects a checkpoint of the wrong size") {
     REQUIRE(game.infoset_count() == 3142152);
     ExternalSamplingSolver<RhodeIslandGame> solver(game, 1);
 
-    const char* path = "/tmp/cfr-old-rih-checkpoint.bin";
+    const std::filesystem::path path = std::filesystem::temp_directory_path() /
+                                       "cfr-mccfr-checkpoint-wrong-size.bin";
     struct RemoveFile {
-        const char* path;
-        ~RemoveFile() { std::remove(path); }
+        std::filesystem::path path;
+        ~RemoveFile() { std::filesystem::remove(path); }
     } cleanup{path};
 
     {
@@ -123,6 +124,6 @@ TEST_CASE("load_strategy_sums rejects a checkpoint of the wrong size") {
     }
 
     REQUIRE_THROWS_WITH(
-        solver.load_strategy_sums(path),
+        solver.load_strategy_sums(path.string()),
         Catch::Matchers::ContainsSubstring("strategy table size mismatch"));
 }

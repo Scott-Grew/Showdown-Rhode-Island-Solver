@@ -67,10 +67,8 @@ TEST_CASE("partition class counts match the published integers") {
     REQUIRE(refined.class_count(2) == 7969);
 }
 
-TEST_CASE("gameshrink partition is equivalent to the published partition") {
+TEST_CASE("the authors' GameShrink partition matches the published file") {
     GsiStrategy strategy = GsiStrategy::load(CFR_GSI_DATA_DIR);
-    INFO("requires GSI data: run make data/gsi/partition");
-    REQUIRE(strategy.available());
     check(strategy, 0);
     check(strategy, 1);
     check(strategy, 2);

@@ -51,8 +51,6 @@ TEST_CASE(
 
 TEST_CASE("rhode island walk conserves value between the two players") {
     GsiStrategy strategy = GsiStrategy::load(CFR_GSI_DATA_DIR);
-    INFO("GSI equilibrium data absent; run `make data/gsi/partition`");
-    REQUIRE(strategy.available());
     cfr::solver::RihStrategyQuery query =
         cfr::grader::gsi_strategy_query(strategy);
     REQUIRE_THAT(cfr::solver::rih_strategy_value(query, 0) +
@@ -63,8 +61,6 @@ TEST_CASE("rhode island walk conserves value between the two players") {
 TEST_CASE(
     "published equilibrium is an exact best response in betting round one") {
     GsiStrategy strategy = GsiStrategy::load(CFR_GSI_DATA_DIR);
-    INFO("GSI equilibrium data absent; run `make data/gsi/partition`");
-    REQUIRE(strategy.available());
     cfr::solver::RihStrategyQuery query =
         cfr::grader::gsi_strategy_query(strategy);
 
@@ -80,8 +76,6 @@ TEST_CASE(
 // best-response walk moves this value.
 TEST_CASE("published equilibrium exploitability is the measured value") {
     GsiStrategy strategy = GsiStrategy::load(CFR_GSI_DATA_DIR);
-    INFO("GSI equilibrium data absent; run `make data/gsi/partition`");
-    REQUIRE(strategy.available());
     cfr::solver::RihExploitability report = cfr::solver::rih_exploitability(
         cfr::grader::gsi_strategy_query(strategy));
     REQUIRE_THAT(report.exploitability, WithinAbs(0.805328, 1e-6));

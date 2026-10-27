@@ -34,6 +34,10 @@ inline void normalize_or_uniform(std::span<double> values,
 }
 
 // Negatives clamp to zero, then normalize. Uniform when nothing is positive.
+// Epsilon 0.0: the clamped values are non-negative, so any positive
+// regret keeps its share however small. Strategy sums use
+// kStrategySumEpsilon so rounding residue in an unvisited row stays
+// uniform.
 inline void regret_matching_in_place(std::span<double> strategy) {
     for (double& value : strategy) value = std::max(value, 0.0);
     normalize_or_uniform(strategy, 0.0);

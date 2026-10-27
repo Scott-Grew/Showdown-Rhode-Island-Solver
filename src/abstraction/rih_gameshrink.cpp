@@ -207,6 +207,7 @@ RihPartition RihPartition::compute() {
 RihPartition RihPartition::refined() const {
     const std::vector<std::uint16_t> rank = showdown_ranks();
     RihPartition current = *this;
+    // Converges in 2 passes on the authors' partition; 32 is headroom.
     for (int pass = 0; pass < 32; ++pass) {
         RihPartition next = current.label(rank, true);
         if (next.class_counts_ == current.class_counts_) return next;

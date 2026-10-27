@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "game/betting_round.hpp"
 #include "game/game.hpp"
 #include "oracles/labels.hpp"
 
@@ -16,8 +17,7 @@ constexpr int kKuhnQueen = 1;
 constexpr int kKuhnKing = 2;
 constexpr int kKuhnDeckSize = 3;
 
-// Kuhn betting action codes. Dealt cards enter the history as raw
-// card ids, without kChanceCardOffset.
+// Kuhn betting action codes.
 constexpr Action kKuhnActionCheck = 0;
 constexpr Action kKuhnActionBet = 1;
 constexpr Action kKuhnActionCall = 2;
