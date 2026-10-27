@@ -64,6 +64,15 @@ public:
     // Each possible deal at a chance node with its probability.
     FixedVector<ChanceOutcome, kMaxChanceOutcomes> chance_outcomes(
         const State& state) const;
+    // The card chance_outcomes would draw for this roll, without
+    // building that list. roll is one
+    // uniform_real_distribution<double>(0, 1) sample.
+    Action sample_chance_action(const State& state, double roll) const {
+        return sample_undealt_card(state, kCardCount, roll);
+    }
+    // Replaces player's hole card and the class infoset_index reads
+    // with it, so the two can never disagree.
+    void set_hole_card(State& state, Player player, int card) const;
 
 private:
     // Shared partition. class_of is an array read on the hot path.

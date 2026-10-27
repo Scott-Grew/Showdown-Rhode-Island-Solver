@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -313,6 +314,69 @@ inline FixedVector<ChanceOutcome, kMaxChanceOutcomes> deal_outcomes(
         outcomes.push_back({kChanceCardOffset + card, 1.0 / remaining_count});
     }
     return outcomes;
+}
+
+// Running sums of 1/n, one prefix per n in 1..52. Each prefix is
+// successive addition of the same double, the walk sample_index
+// does. A multiply is not the same bits, and the checkpoint
+// depends on these sums. The volatile stores keep the compiler
+// from turning the loop into that multiply.
+struct UniformPrefix {
+    static constexpr int kMaxN = static_cast<int>(kMaxChanceOutcomes);
+    static constexpr int kSumCount = kMaxN * (kMaxN - 1) / 2;
+    std::array<double, kSumCount> sums{};
+    std::array<int, kMaxN + 1> offset{};
+
+    UniformPrefix() {
+        int cursor = 0;
+        for (int n = 1; n <= kMaxN; ++n) {
+            offset[static_cast<std::size_t>(n)] = cursor;
+            double probability = 1.0 / n;
+            volatile double addend = probability;
+            volatile double cumulative = 0.0;
+            for (int i = 0; i + 1 < n; ++i) {
+                cumulative = cumulative + addend;
+                sums[static_cast<std::size_t>(cursor++)] = cumulative;
+            }
+        }
+    }
+};
+
+inline const UniformPrefix& uniform_prefix() {
+    static const UniformPrefix prefix;
+    return prefix;
+}
+
+// Card at the index sample_index would return for this roll on
+// deal_outcomes(state, deck_size). roll is one draw from
+// uniform_real_distribution<double>(0, 1). The index picks the
+// undealt card in ascending order from a dealt-card mask.
+inline Action sample_undealt_card(const State& state, int deck_size,
+                                  double roll) {
+    assert(deck_size > 0);
+    assert(deck_size <= UniformPrefix::kMaxN);
+    static_assert(UniformPrefix::kMaxN <= 64, "dealt mask is 64 bits");
+    std::uint64_t dealt = 0;
+    auto mark = [&](int card) {
+        if (card >= 0) dealt |= std::uint64_t{1} << card;
+    };
+    mark(state.hole_cards[0]);
+    mark(state.hole_cards[1]);
+    for (std::uint8_t index = 0; index < state.board_count; ++index)
+        mark(state.board_cards[index]);
+
+    int remaining = deck_size - std::popcount(dealt);
+    assert(remaining > 0);
+    const UniformPrefix& prefix = uniform_prefix();
+    const double* begin =
+        prefix.sums.data() + prefix.offset[static_cast<std::size_t>(remaining)];
+    const double* end = begin + (remaining - 1);
+    int chosen = static_cast<int>(std::upper_bound(begin, end, roll) - begin);
+
+    std::uint64_t undealt = (~dealt) & ((std::uint64_t{1} << deck_size) - 1);
+    for (int skip = 0; skip < chosen; ++skip) undealt &= undealt - 1;
+    assert(undealt != 0);
+    return kChanceCardOffset + std::countr_zero(undealt);
 }
 
 // Longest possible history: per round one opening check, the

@@ -18,6 +18,7 @@ using cfr::kCardCount;
 using cfr::make_card;
 using cfr::eval::evaluate_3card;
 using cfr::eval::HandRank;
+using cfr::eval::lookup_3card;
 using cfr::eval::naive::naive_evaluate_3card;
 using cfr::eval::naive::NaiveRank;
 
@@ -105,6 +106,7 @@ TEST_CASE("RIH eval3 matches the naive reference order over all C(52,3) hands",
     std::vector<NaiveRank> naive_ranks;
     fast_ranks.reserve(kExpectedHandCount);
     naive_ranks.reserve(kExpectedHandCount);
+    int lookup_mismatches = 0;
 
     for (int c0 = 0; c0 < kCardCount; ++c0) {
         for (int c1 = c0 + 1; c1 < kCardCount; ++c1) {
@@ -112,13 +114,19 @@ TEST_CASE("RIH eval3 matches the naive reference order over all C(52,3) hands",
                 std::array<Card, 3> hand = {static_cast<Card>(c0),
                                             static_cast<Card>(c1),
                                             static_cast<Card>(c2)};
-                fast_ranks.push_back(evaluate_3card(hand.data()));
+                HandRank ranked = evaluate_3card(hand.data());
+                fast_ranks.push_back(ranked);
                 naive_ranks.push_back(naive_evaluate_3card(hand.data()));
+                std::array<Card, 3> rotated = {hand[1], hand[2], hand[0]};
+                if (lookup_3card(hand.data()) != ranked ||
+                    lookup_3card(rotated.data()) != ranked)
+                    ++lookup_mismatches;
             }
         }
     }
 
     REQUIRE(fast_ranks.size() == kExpectedHandCount);
+    REQUIRE(lookup_mismatches == 0);
 
     std::vector<std::size_t> order(fast_ranks.size());
     std::iota(order.begin(), order.end(), std::size_t{0});

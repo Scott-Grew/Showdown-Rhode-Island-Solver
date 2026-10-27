@@ -3,6 +3,7 @@
 
 #include "eval/eval3.hpp"
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cstdint>
@@ -38,12 +39,16 @@ constexpr int binomial(int n, int k) {
     return result;
 }
 
-// Position of three distinct ascending ranks in colexicographic
-// order, so a higher top card always ranks higher.
-int colex_index_3(int rank_low, int rank_mid, int rank_high) {
+// Position of three distinct ascending values in colexicographic
+// order. Ranks and card ids both use it.
+constexpr int colex_index_3(int rank_low, int rank_mid, int rank_high) {
     return binomial(rank_low, 1) + binomial(rank_mid, 2) +
            binomial(rank_high, 3);
 }
+
+// C(52, 3). The last three card ids are the highest index.
+static_assert(colex_index_3(49, 50, 51) == 22099);
+constexpr std::size_t kThreeCardHands = 22100;
 
 // Kicker rank renumbered to 0..11 by skipping the pair's rank.
 int compact_rank(int rank, int excluded_rank) {
@@ -133,6 +138,42 @@ HandRank evaluate_3card(const Card* cards) {
     int unpaired_order = colex_index_3(
         groups.single_ranks[0], groups.single_ranks[1], groups.single_ranks[2]);
     return hand_rank(is_flush ? kFlush : kHighCard, unpaired_order);
+}
+
+namespace {
+
+// Filled by evaluate_3card, so the table cannot drift from it.
+const std::array<HandRank, kThreeCardHands>& three_card_table() {
+    static const std::array<HandRank, kThreeCardHands> table = [] {
+        std::array<HandRank, kThreeCardHands> ranks{};
+        Card hand[3];
+        for (int low = 0; low < kCardCount; ++low) {
+            for (int mid = low + 1; mid < kCardCount; ++mid) {
+                for (int high = mid + 1; high < kCardCount; ++high) {
+                    hand[0] = static_cast<Card>(low);
+                    hand[1] = static_cast<Card>(mid);
+                    hand[2] = static_cast<Card>(high);
+                    ranks[static_cast<std::size_t>(
+                        colex_index_3(low, mid, high))] = evaluate_3card(hand);
+                }
+            }
+        }
+        return ranks;
+    }();
+    return table;
+}
+
+}
+
+HandRank lookup_3card(const Card* cards) {
+    int low = cards[0];
+    int mid = cards[1];
+    int high = cards[2];
+    if (low > mid) std::swap(low, mid);
+    if (mid > high) std::swap(mid, high);
+    if (low > mid) std::swap(low, mid);
+    return three_card_table()[static_cast<std::size_t>(
+        colex_index_3(low, mid, high))];
 }
 
 }

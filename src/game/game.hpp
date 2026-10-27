@@ -27,16 +27,18 @@ constexpr Player opponent(Player player) {
 
 // Fixed capacities of the State arrays below. A betting round holds
 // at most eight actions, and every game here deals from at most 52
-// cards. History is 30 rather than 32 so the two closing-sequence
-// bytes fit and State stays within 64 bytes. The longest hand is
-// 19 entries.
-inline constexpr std::size_t kMaxHistory = 30;
+// cards. History is 26 rather than 30 so each player's stored class
+// fits and State stays within 64 bytes. The longest hand is 19
+// entries.
+inline constexpr std::size_t kMaxHistory = 26;
 inline constexpr std::size_t kMaxBoardCards = 2;
 inline constexpr std::size_t kMaxActionsPerRound = 8;
 inline constexpr std::size_t kMaxChanceOutcomes = 52;
 
 // Stack sequence with a compile-time cap. Traversal returns these
-// instead of allocating a std::vector.
+// instead of allocating a std::vector. Storage is not
+// value-initialised: every element below size_ is written before
+// it is read, and zeroing the tail showed up under the sampler.
 template <typename T, std::size_t N>
 class FixedVector {
 public:
@@ -69,7 +71,7 @@ public:
     }
 
 private:
-    std::array<T, N> data_{};
+    std::array<T, N> data_;
     std::size_t size_ = 0;
 };
 
@@ -98,6 +100,10 @@ struct State {
     std::array<int, 2> round_contribution{};
     int level_to_match = 0;
     std::array<std::uint16_t, 2> showdown_rank{};
+    // card_class[p] is player p's refined class of the cards dealt
+    // so far. Rhode Island writes it when a card is dealt and
+    // infoset_index reads it. Other games leave it at zero.
+    std::array<std::uint16_t, 2> card_class{};
 };
 
 static_assert(sizeof(State) <= 64, "State must stay a cheap copy");

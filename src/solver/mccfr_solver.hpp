@@ -240,19 +240,28 @@ private:
         return distribution.size() - 1;
     }
 
-    // One chance outcome. The probabilities are copied onto the
-    // stack and drawn by sample_index, the only copy of the
-    // arithmetic the checkpoint depends on.
+    // One chance outcome. Games that can map the roll onto a card
+    // do so; the roll is the same distribution sample_index draws,
+    // so the checkpoint stays byte-identical. The others still sum
+    // chance_outcomes, which is the arithmetic Kuhn and Leduc use.
     game::Action sample_chance_action(const game::State& state,
                                       TraversalContext& context) const {
-        auto outcomes = game_.chance_outcomes(state);
-        std::array<double, game::kMaxChanceOutcomes> probabilities;
-        for (std::size_t i = 0; i < outcomes.size(); ++i)
-            probabilities[i] = outcomes[i].probability;
-        std::size_t sampled = sample_index(
-            std::span<const double>(probabilities.data(), outcomes.size()),
-            context.random_engine);
-        return outcomes[sampled].action;
+        if constexpr (requires(double roll) {
+                          game_.sample_chance_action(state, roll);
+                      }) {
+            double roll = std::uniform_real_distribution<double>(
+                0.0, 1.0)(context.random_engine);
+            return game_.sample_chance_action(state, roll);
+        } else {
+            auto outcomes = game_.chance_outcomes(state);
+            std::array<double, game::kMaxChanceOutcomes> probabilities;
+            for (std::size_t i = 0; i < outcomes.size(); ++i)
+                probabilities[i] = outcomes[i].probability;
+            std::size_t sampled = sample_index(
+                std::span<const double>(probabilities.data(), outcomes.size()),
+                context.random_engine);
+            return outcomes[sampled].action;
+        }
     }
 
     // Regret-matching strategy of one infoset, read from the live

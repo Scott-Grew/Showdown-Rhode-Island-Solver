@@ -63,8 +63,8 @@ void remember_showdown_ranks(State& state) {
     std::array<Card, 3> hand1 = {static_cast<Card>(state.hole_cards[1]),
                                  static_cast<Card>(state.board_cards[0]),
                                  static_cast<Card>(state.board_cards[1])};
-    state.showdown_rank[0] = cfr::eval::evaluate_3card(hand0.data());
-    state.showdown_rank[1] = cfr::eval::evaluate_3card(hand1.data());
+    state.showdown_rank[0] = cfr::eval::lookup_3card(hand0.data());
+    state.showdown_rank[1] = cfr::eval::lookup_3card(hand1.data());
 }
 
 // In-round progress codes, and closing sequences of a finished round.
@@ -84,7 +84,7 @@ const cfr::abstraction::RihPartition& shared_partition() {
 
 // GameShrink class of the acting player's own cards. The span length
 // is the round: hole, hole and flop, or all three.
-std::uint32_t own_class(const cfr::abstraction::RihPartition& partition,
+std::uint16_t own_class(const cfr::abstraction::RihPartition& partition,
                         const State& state, Player player) {
     std::array<Card, 3> cards{};
     cards[0] = static_cast<Card>(state.hole_cards[player]);
@@ -96,6 +96,16 @@ std::uint32_t own_class(const cfr::abstraction::RihPartition& partition,
         cards[count++] = static_cast<Card>(state.board_cards[1]);
     }
     return partition.class_of(std::span<const Card>(cards.data(), count));
+}
+
+// Each player's refined class of the cards dealt so far. A player
+// with no hole card yet has nothing to store.
+void remember_own_classes(const cfr::abstraction::RihPartition& partition,
+                          State& state) {
+    if (state.hole_cards[0] >= 0)
+        state.card_class[0] = own_class(partition, state, 0);
+    if (state.hole_cards[1] >= 0)
+        state.card_class[1] = own_class(partition, state, 1);
 }
 
 }
@@ -155,6 +165,7 @@ State RhodeIslandGame::apply_action(const State& state, Action action) const {
     if (dealing) {
         deal_and_advance(next, action - kChanceCardOffset,
                          kRihMaxRaisesPerRound);
+        remember_own_classes(*partition_, next);
         if (next.board_count == 2) remember_showdown_ranks(next);
         return next;
     }
@@ -224,11 +235,12 @@ std::uint32_t RhodeIslandGame::infoset_count() const {
 //           |   + class(hole, flop, turn)
 //
 // progress is the active round. closingR was stored when round R
-// closed. Both are O(1); the class is one array read.
+// closed. The class was stored when the latest card was dealt.
 std::uint32_t RhodeIslandGame::infoset_index(const State& state) const {
     Player acting_player = current_player(state);
     std::uint32_t progress = static_cast<std::uint32_t>(round_progress(state));
-    std::uint32_t card_class = own_class(*partition_, state, acting_player);
+    std::uint32_t card_class = state.card_class[acting_player];
+    assert(card_class == own_class(*partition_, state, acting_player));
     constexpr std::uint32_t kProgress =
         static_cast<std::uint32_t>(kRihRoundProgressCount);
     constexpr std::uint32_t kClosing =
@@ -258,6 +270,14 @@ std::uint32_t RhodeIslandGame::infoset_index(const State& state) const {
 FixedVector<ChanceOutcome, kMaxChanceOutcomes> RhodeIslandGame::chance_outcomes(
     const State& state) const {
     return deal_outcomes(state, kCardCount);
+}
+
+void RhodeIslandGame::set_hole_card(State& state, Player player,
+                                    int card) const {
+    assert(player < kPlayerCount);
+    assert(card >= 0 && card < kCardCount);
+    state.hole_cards[player] = static_cast<std::int8_t>(card);
+    state.card_class[player] = own_class(*partition_, state, player);
 }
 
 }

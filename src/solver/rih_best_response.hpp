@@ -74,7 +74,14 @@ RihStrategyQuery rih_average_strategy_query(const AverageStrategySource& source,
 
         game::State probe = state;
         for (int card = 0; card < kCardCount; ++card) {
-            probe.hole_cards[acting_player] = static_cast<std::int8_t>(card);
+            if constexpr (requires {
+                              game.set_hole_card(probe, acting_player, card);
+                          }) {
+                game.set_hole_card(probe, acting_player, card);
+            } else {
+                probe.hole_cards[acting_player] =
+                    static_cast<std::int8_t>(card);
+            }
             source.average_strategy_into(
                 game.infoset_index(probe), action_count,
                 std::span<double>(

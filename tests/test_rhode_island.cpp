@@ -5,6 +5,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <unordered_map>
 #include <utility>
@@ -347,6 +348,44 @@ TEST_CASE(
     for (auto& [action, probability] : turn_outcomes)
         turn_probability_sum += probability;
     REQUIRE_THAT(turn_probability_sum, Catch::Matchers::WithinAbs(1.0, 1e-12));
+}
+
+// The fast draw must pick the same card as summing chance_outcomes,
+// including the rolls that land on a partial sum.
+void expect_same_draw(const RhodeIslandGame& game, const State& state) {
+    auto outcomes = game.chance_outcomes(state);
+    REQUIRE(outcomes.size() >= 1);
+    double cumulative = 0.0;
+    for (std::size_t i = 0; i + 1 < outcomes.size(); ++i) {
+        cumulative += outcomes[i].probability;
+        double below = std::nextafter(cumulative, 0.0);
+        REQUIRE(game.sample_chance_action(state, below) == outcomes[i].action);
+        REQUIRE(game.sample_chance_action(state, cumulative) !=
+                outcomes[i].action);
+    }
+    REQUIRE(game.sample_chance_action(state, 0.0) == outcomes[0].action);
+    REQUIRE(game.sample_chance_action(state, std::nextafter(1.0, 0.0)) ==
+            outcomes[outcomes.size() - 1].action);
+}
+
+TEST_CASE("rhode island chance sample matches the cumulative draw") {
+    RhodeIslandGame game;
+    State state = game.initial_state();
+    expect_same_draw(game, state);
+    for (int held = 0; held < cfr::kCardCount; ++held) {
+        State one =
+            game.apply_action(game.initial_state(), kChanceCardOffset + held);
+        expect_same_draw(game, one);
+    }
+    state = game.apply_action(state, kChanceCardOffset + 0);
+    state = game.apply_action(state, kChanceCardOffset + 17);
+    state = game.apply_action(state, kActionCallCheck);
+    state = game.apply_action(state, kActionCallCheck);
+    expect_same_draw(game, state);
+    state = game.apply_action(state, kChanceCardOffset + 51);
+    state = game.apply_action(state, kActionRaise);
+    state = game.apply_action(state, kActionCallCheck);
+    expect_same_draw(game, state);
 }
 
 TEST_CASE(
@@ -737,7 +776,7 @@ TEST_CASE("rhode island infoset index matches player round betting and class") {
                 (state.board_count >= 2 && state.board_cards[1] == hole))
                 continue;
             State probe = state;
-            probe.hole_cards[player] = static_cast<std::int8_t>(hole);
+            game.set_hole_card(probe, player, hole);
             std::uint16_t id =
                 cls(partition, hole,
                     state.board_count >= 1 ? state.board_cards[0] : -1,

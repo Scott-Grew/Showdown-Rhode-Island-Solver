@@ -16,4 +16,9 @@ using HandRank = std::uint16_t;
 // distinct card ids.
 HandRank evaluate_3card(const Card* cards);
 
+// evaluate_3card, read from a table that function filled. The
+// index is the colexicographic rank of the three cards sorted
+// ascending. cards must point at three distinct card ids.
+HandRank lookup_3card(const Card* cards);
+
 }
