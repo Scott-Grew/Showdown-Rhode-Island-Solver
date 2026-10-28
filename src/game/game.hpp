@@ -73,14 +73,16 @@ private:
 // Kuhn leaves them at the defaults. The active round's actions
 // are history's last round_len entries. contribution includes
 // the ante. showdown_rank is filled when Rhode Island deals the
-// turn. round_contribution and level_to_match are the running
-// pot of the active round. closing[r] is the closing-sequence
-// code of completed round r, written when that round's board
-// card is dealt.
+// turn. round_contribution is each seat's chips this round, and
+// level_to_match the amount the next call must reach. closing[r]
+// is the closing-sequence code of completed round r, written when
+// that round's board card is dealt.
 struct State {
     std::array<std::int8_t, 2> hole_cards{-1, -1};
     std::array<std::int8_t, kMaxBoardCards> board_cards{-1, -1};
     std::uint8_t board_count = 0;
+    // Betting entries are fold 0, call or check 1, raise 2 (Kuhn has
+    // its own four); a dealt card is kChanceCardOffset + card.
     std::array<std::uint8_t, kMaxHistory> history{};
     std::uint8_t history_len = 0;
     std::uint8_t round_len = 0;
@@ -124,6 +126,8 @@ concept GameLike = requires(const CandidateGame game, const State state,
         game.chance_outcomes(state)
     } -> std::same_as<FixedVector<ChanceOutcome, kMaxChanceOutcomes>>;
     { CandidateGame::kMaxActions } -> std::convertible_to<std::size_t>;
+    // A game may also define sample_chance_action(state, roll), which
+    // the sampling solver uses in place of summing chance_outcomes.
 };
 
 }

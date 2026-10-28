@@ -92,6 +92,12 @@ void remember_own_classes(const cfr::abstraction::RihPartition& partition,
         state.card_class[1] = own_class(partition, state, 1);
 }
 
+int bet_size_of(const State& state) {
+    if (state.board_count == 0) return kRihRound1Bet;
+    if (state.board_count == 1) return kRihRound2Bet;
+    return kRihRound3Bet;
+}
+
 }
 
 RhodeIslandGame::RhodeIslandGame() : partition_(&shared_partition()) {}
@@ -124,12 +130,6 @@ Player RhodeIslandGame::current_player(const State& state) const {
 FixedVector<Action, RhodeIslandGame::kMaxActions>
 RhodeIslandGame::legal_actions(const State& state) const {
     return round_legal_actions<kMaxActions>(state, kRihMaxRaisesPerRound);
-}
-
-int bet_size_of(const State& state) {
-    if (state.board_count == 0) return kRihRound1Bet;
-    if (state.board_count == 1) return kRihRound2Bet;
-    return kRihRound3Bet;
 }
 
 // Appends the entry. A dealt card is stored, and a board card opens

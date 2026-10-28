@@ -36,6 +36,7 @@ SequenceFormSize rih_sequence_form_size(
     state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
     Action fixed_flop = kChanceCardOffset + make_card(2, 0);
     Action fixed_turn = kChanceCardOffset + make_card(3, 0);
+    // +1 is the empty sequence column/row in the sequence form.
     SequenceFormSize totals{{0, 0}, {1, 1}};
     auto visit = [&](auto&& self, const State& node) -> void {
         if (game.is_terminal(node)) return;
@@ -143,6 +144,7 @@ State deal_two(const RhodeIslandGame& game, int first, int second) {
 TEST_CASE("RIH unabstracted sequence-form size matches the paper") {
     // Gilpin & Sandholm, J. ACM 2007, p. 25:4.
     SequenceFormSize size = rih_sequence_form_size({52, 52 * 51, 52 * 51 * 50});
+    // +1 is the empty sequence in the matrix layout.
     long long rows = size.sequences[0] + size.infosets[1] + 1;
     long long columns = size.sequences[1] + size.infosets[0] + 1;
     for (std::size_t player = 0; player < 2; ++player) {
@@ -253,36 +255,25 @@ TEST_CASE("rhode island showdown: equal-ranked hands split the pot") {
 
 namespace {
 
-State permute_suits(const State& state,
-                    const std::array<int, 4>& suit_permutation) {
+State replay_with_suit_permutation(const RhodeIslandGame& game,
+                                   const State& target,
+                                   const std::array<int, 4>& suit_permutation) {
     auto remap = [&suit_permutation](int card) {
         return static_cast<int>(
             make_card(cfr::card_rank(static_cast<cfr::Card>(card)),
                       suit_permutation[static_cast<std::size_t>(
                           cfr::card_suit(static_cast<cfr::Card>(card)))]));
     };
-
-    State permuted = state;
-    for (std::size_t i = 0; i < 2; ++i) {
-        if (state.hole_cards[i] >= 0) {
-            permuted.hole_cards[i] =
-                static_cast<std::int8_t>(remap(state.hole_cards[i]));
+    State state = game.initial_state();
+    for (std::uint8_t i = 0; i < target.history_len; ++i) {
+        Action action = target.history[i];
+        if (action >= kChanceCardOffset) {
+            int card = remap(action - kChanceCardOffset);
+            action = kChanceCardOffset + card;
         }
+        state = game.apply_action(state, action);
     }
-    std::size_t board_count =
-        std::min<std::size_t>(state.board_count, kMaxBoardCards);
-    for (std::size_t i = 0; i < board_count; ++i) {
-        permuted.board_cards[i] =
-            static_cast<std::int8_t>(remap(state.board_cards[i]));
-    }
-    for (std::uint8_t i = 0; i < state.history_len; ++i) {
-        if (state.history[i] >= kChanceCardOffset) {
-            permuted.history[i] = static_cast<std::uint8_t>(
-                kChanceCardOffset +
-                remap(state.history[i] - kChanceCardOffset));
-        }
-    }
-    return permuted;
+    return state;
 }
 
 }
@@ -298,7 +289,7 @@ TEST_CASE(
     long long states_checked = 0;
 
     walk(game, state, [&](const State& s) {
-        State permuted = permute_suits(s, rotate_suits);
+        State permuted = replay_with_suit_permutation(game, s, rotate_suits);
         if (game.is_terminal(s)) {
             REQUIRE(game.terminal_utility(s, 0) ==
                     game.terminal_utility(permuted, 0));
@@ -315,20 +306,22 @@ TEST_CASE(
 
 TEST_CASE("rhode island: infoset_label determines the infoset index") {
     RhodeIslandGame game;
-    State state = game.initial_state();
-    state = game.apply_action(state, kChanceCardOffset + make_card(0, 0));
-    state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
-
     std::unordered_map<InfosetLabel, std::uint32_t> label_to_index;
-    long long infosets_visited = 0;
-    walk(game, state, [&](const State& s) {
+    int duplicate_labels = 0;
+    auto check = [&](const State& s) {
         if (game.is_terminal(s) || game.is_chance(s)) return;
         auto [entry, inserted] =
             label_to_index.emplace(rih_infoset_label(s), game.infoset_index(s));
-        if (!inserted) REQUIRE(entry->second == game.infoset_index(s));
-        ++infosets_visited;
-    });
-    REQUIRE(infosets_visited > 0);
+        if (!inserted) {
+            REQUIRE(entry->second == game.infoset_index(s));
+            ++duplicate_labels;
+        }
+    };
+    for (int opponent_hole : {1, 9}) {
+        State state = deal_two(game, 0, opponent_hole);
+        walk(game, state, check);
+    }
+    REQUIRE(duplicate_labels > 0);
 }
 
 TEST_CASE(
@@ -418,6 +411,9 @@ std::uint16_t cls(const cfr::abstraction::RihPartition& partition, int hole,
     if (turn >= 0) cards[count++] = static_cast<cfr::Card>(turn);
     return partition.class_of(std::span<const cfr::Card>(cards.data(), count));
 }
+// One round's betting lines: open lines end at a decision, closed
+// lines end the round at the next deal. Lines ending in a fold are in
+// neither.
 std::pair<std::vector<Actions>, std::vector<Actions>> round_lines(
     const RhodeIslandGame& game) {
     std::vector<Actions> open, closed;
@@ -438,6 +434,9 @@ std::pair<std::vector<Actions>, std::vector<Actions>> round_lines(
     visit(visit, deal_two(game, 0, 1));
     return {open, closed};
 }
+// Plays every closed line through each earlier round, then every open
+// line. An even-length line leaves seat 0 to act, so it is played from
+// the deal that gives hole to seat 0.
 template <class Fn>
 void cross(const RhodeIslandGame& game, const std::vector<Actions>& open,
            const std::vector<Actions>& closed, int hole, int flop, int turn,
@@ -475,6 +474,7 @@ TEST_CASE("rhode island gameshrink index hits every row once") {
     std::vector<int> rep0(partition.class_count(0), -1);
     std::vector<int> rep1(partition.class_count(1), -1);
     std::vector<int> rep2(partition.class_count(2), -1);
+    // Representatives pack their cards base 64.
     for (int i = 0, deck = cfr::kCardCount; i < deck * deck * deck; ++i) {
         int hole = i / (deck * deck), flop = i / deck % deck, turn = i % deck;
         if (rep0[cls(partition, hole)] < 0) rep0[cls(partition, hole)] = hole;

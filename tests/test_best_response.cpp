@@ -52,6 +52,8 @@ TEST_CASE(
     CHECK(exploitability(game, uniform) > 0.1);
 }
 
+// Against a uniform opponent, player 0's alternatives are always the
+// first legal action, always the last, and uniform.
 TEST_CASE("BR value weakly improves on any fixed alternative strategy") {
     KuhnGame game;
     StrategyProfile opponent = uniform_profile(game);

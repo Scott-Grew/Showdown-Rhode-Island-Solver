@@ -1,6 +1,6 @@
 // GameShrink partitions for one Rhode Island Hold'em player.
 // compute() reproduces the authors' classes: equal child-label
-// multisets, and at a showdown equal (wins, ties, losses) counts.
+// multisets, and at a showdown equal opponent-outcome multisets.
 // That leaf test never looks at the opponent's class, so their
 // partition is lossy in the full game. Canonical labels still
 // assign dense ids in first-seen order.
@@ -30,7 +30,7 @@ public:
     std::uint32_t class_count(std::size_t round) const;  // round 0, 1, 2
 
 private:
-    // opponent_labels is false for the authors' (wins, ties, losses) leaf.
+    // opponent_labels is false for the authors' leaf keyed by loss/tie/win.
     RihPartition label(std::span<const std::uint16_t> showdown_rank,
                        bool opponent_labels) const;
     static constexpr std::size_t kRound0Offset = 0;

@@ -95,9 +95,11 @@ std::uint16_t intern_bag(std::map<Bag<N>, std::uint16_t>& ids,
 
 }
 
-// Round 3's leaf is (current class, opponent class or a constant,
-// showdown outcome). Rounds 2 and 1 take the sorted multiset of those
-// new child ids. The sibling rule then names each class by its parent.
+// Round 2's (turn) key is the current class plus the sorted (opponent
+// class, or 0 under the authors' rule; loss/tie/win) pair per opponent
+// card. Rounds 1 and 0 key on the current class plus the sorted ids of
+// their children. Final round 1 and 2 ids pair the parent's new class
+// with that bottom-up id, so no class spans two parents.
 RihPartition RihPartition::label(std::span<const std::uint16_t> showdown_rank,
                                  bool opponent_labels) const {
     using Leaf = std::pair<std::uint16_t, std::uint8_t>;
@@ -119,11 +121,14 @@ RihPartition RihPartition::label(std::span<const std::uint16_t> showdown_rank,
                 continue;
             std::size_t opp = triple_index(opponent, flop, turn);
             std::uint16_t theirs = showdown_rank[opp];
-            std::uint8_t outcome = 1;
+            constexpr std::uint8_t kOutcomeLoss = 0;
+            constexpr std::uint8_t kOutcomeTie = 1;
+            constexpr std::uint8_t kOutcomeWin = 2;
+            std::uint8_t outcome = kOutcomeTie;
             if (mine > theirs)
-                outcome = 2;
+                outcome = kOutcomeWin;
             else if (mine < theirs)
-                outcome = 0;
+                outcome = kOutcomeLoss;
             std::uint16_t opp_class = 0;
             if (opponent_labels)
                 opp_class = class_by_tuple_[kRound2Offset + opp];

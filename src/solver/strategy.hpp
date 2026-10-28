@@ -10,7 +10,8 @@ namespace cfr::solver {
 
 namespace detail {
 
-// Size of the per-node stack buffers; the solver asserts against it.
+// Size of the per-node stack buffers, far above any game's 2 or 3
+// actions; the solver asserts against it.
 inline constexpr std::size_t kMaxActionsPerInfoset = 64;
 
 }

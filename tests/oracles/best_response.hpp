@@ -97,8 +97,9 @@ double node_value(const GameT& game, const game::State& state,
                   const StatesByInfoset& states_by_infoset,
                   BestResponseMemo& memo);
 
-// Value per unit of reach of the best single action at an infoset,
-// chosen jointly for all states the responder cannot tell apart.
+// Value per unit of opponent reach of the best single action at an
+// infoset, chosen jointly for all states the responder cannot tell
+// apart.
 template <typename GameT>
 double best_response_value_at(const GameT& game,
                               const game::InfosetLabel& infoset_label,

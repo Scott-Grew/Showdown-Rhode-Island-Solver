@@ -119,8 +119,9 @@ private:
         return value;
     }
 
-    // Payoff per hole card after a fold: the same chips against every
-    // opponent card, weighted by the board deals that never happen.
+    // Payoff per hole card after a fold: the winner gains the folder's
+    // contribution against every other opponent card, weighted by the
+    // board deals that never happen.
     RihCardVector fold_value(const State& state, Player folder,
                              const std::array<int, 2>& contributions,
                              const RihCardVector& opponent_reach) const {
@@ -142,9 +143,10 @@ private:
         return value;
     }
 
-    // Payoff per hole card at a showdown. Tie groups are swept
-    // weakest first: a card wins the stake from all weaker reach and
-    // loses it to all stronger reach.
+    // Payoff per hole card at a showdown. Tie groups are swept weakest
+    // first: a card wins the stake from all weaker reach and loses it to
+    // all stronger reach. Ties pay nothing, so an opponent holding the
+    // same card, which always ties, drops out with them.
     RihCardVector showdown_value(double stake,
                                  const RihCardVector& opponent_reach,
                                  const BoardRanks& ranks) const {
@@ -299,8 +301,10 @@ private:
     int deviation_round_;
 };
 
-// Average value per hand. The two dealt hole cards only move the
-// game past its chance nodes; the walk covers every holding.
+// Average value per hand. The dealt cards 0 and 1 only move the game
+// past its hole-card chance nodes: queries overwrite them through
+// set_hole_card, they may reappear on the board, and showdown payoffs
+// come only from BoardRanks.
 double walk_root(const RihStrategyQuery& strategy, Player responder,
                  ResponderPolicy policy,
                  int deviation_round = kDeviateInEveryRound) {

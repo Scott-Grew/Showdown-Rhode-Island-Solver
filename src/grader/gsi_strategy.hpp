@@ -20,7 +20,8 @@ namespace cfr::grader {
 
 // Dimensions of the published Gilpin-Sandholm strategy files:
 // signal-tree size, classes per round, sequences and row width.
-inline constexpr int kGsiSignalNodeCount = 135304;
+// One player's signal-tree nodes: 52 + 52*51 + 52*51*50.
+inline constexpr int kGsiOnePlayerSignalNodeCount = 135304;
 inline constexpr int kGsiRound1ClassCount = 13;
 inline constexpr int kGsiRound2ClassCount = 205;
 inline constexpr int kGsiSequencesPerRound = 7;

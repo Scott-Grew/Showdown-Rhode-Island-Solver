@@ -39,6 +39,8 @@ cfr::solver::RihStrategyQuery player0_bets_only_in_round(int target_round) {
 
 }
 
+// Round 0, 1 and 2 are before the flop, the turn and the showdown.
+// Player 0 bets (index 1) only in that round; player 1 folds to it.
 TEST_CASE(
     "a fold before the board is dealt wins the opponent ante in each round") {
     for (int round = 0; round < 3; ++round) {

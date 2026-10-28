@@ -70,12 +70,12 @@ verify-discovery: build
 test: data/gsi/partition verify-discovery
 	ctest --test-dir $(RELEASE_DIR) --output-on-failure
 
-asan:
+asan: data/gsi/partition
 	cmake -B $(ASAN_DIR) -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
 	cmake --build $(ASAN_DIR)
 	ctest --test-dir $(ASAN_DIR) --output-on-failure
 
-tsan:
+tsan: data/gsi/partition
 	cmake -B $(TSAN_DIR) -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=thread" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
 	cmake --build $(TSAN_DIR)
 	ctest --test-dir $(TSAN_DIR) --output-on-failure

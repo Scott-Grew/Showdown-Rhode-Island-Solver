@@ -75,6 +75,8 @@ RihStrategyQuery rih_average_strategy_query(const AverageStrategySource& source,
 
         game::State probe = state;
         for (int card = 0; card < kCardCount; ++card) {
+            // Rhode Island's infoset_index reads the cached card_class,
+            // so it needs set_hole_card; Kuhn and Leduc patch hole_cards.
             if constexpr (requires {
                               game.set_hole_card(probe, acting_player, card);
                           }) {

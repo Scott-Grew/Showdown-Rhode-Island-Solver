@@ -70,6 +70,9 @@ inline bool opened_with_check(const State& state) {
     return first == kActionCallCheck;
 }
 
+// 2 * raises + 1 if the round opened with a check: 0 to 7 with three
+// raises allowed. The seat to act is round_len % 2: codes 0, 3, 4, 7
+// leave seat 0 to act and 1, 2, 5, 6 seat 1.
 inline int round_progress(const State& state) {
     return static_cast<int>(state.raises_used) * 2 +
            (opened_with_check(state) ? 1 : 0);
@@ -164,8 +167,8 @@ inline void apply_betting_action(State& state, Action action, int bet_size) {
     ++state.round_len;
 }
 
-// Probabilities are 1/remaining, in ascending card order, the same
-// values the sampler sums.
+// Probabilities are 1/remaining, in ascending card order — the same
+// values ExternalSamplingSolver::sample_index sums.
 inline FixedVector<ChanceOutcome, kMaxChanceOutcomes> deal_outcomes(
     const State& state, int deck_size) {
     assert(deck_size > 0);

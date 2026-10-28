@@ -35,6 +35,7 @@ add_library(cfr_game STATIC
     src/abstraction/rih_gameshrink.cpp
 )
 target_include_directories(cfr_game PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(cfr_game PUBLIC cfr_eval)
 
 add_library(cfr_eval STATIC
     src/eval/eval3.cpp
@@ -45,7 +46,7 @@ add_library(cfr_solver STATIC
     src/solver/rih_best_response.cpp
 )
 target_include_directories(cfr_solver PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(cfr_solver PUBLIC cfr_game cfr_eval Threads::Threads)
+target_link_libraries(cfr_solver PUBLIC cfr_game Threads::Threads)
 
 add_library(cfr_grader STATIC
     src/grader/gsi_strategy.cpp

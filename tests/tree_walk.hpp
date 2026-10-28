@@ -121,6 +121,7 @@ double expected_value(const GameT& game, const StrategyProfile& profile,
 
     auto actions = game.legal_actions(state);
     auto profile_entry = profile.find(game.infoset_label(state));
+    // Missing infoset: uniform over legal actions.
     double uniform_probability = 1.0 / static_cast<double>(actions.size());
     double value = 0.0;
     for (std::size_t i = 0; i < actions.size(); ++i) {

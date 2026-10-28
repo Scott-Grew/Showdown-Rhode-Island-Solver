@@ -41,7 +41,7 @@ StrategyProfile average_strategy_profile(
 
 }
 
-TEST_CASE("external sampling reaches the analytic kuhn game value") {
+TEST_CASE("external sampling kuhn exploitability is below 0.01") {
     KuhnGame game;
     ExternalSamplingSolver<KuhnGame> solver(game, 20260726);
     solver.run_iterations(200000);
@@ -50,7 +50,7 @@ TEST_CASE("external sampling reaches the analytic kuhn game value") {
             1e-2);
 }
 
-TEST_CASE("external sampling and vanilla cfr agree on leduc") {
+TEST_CASE("external sampling leduc exploitability is below 0.1") {
     LeducGame game;
     ExternalSamplingSolver<LeducGame> solver(game, 20260726);
     solver.run_iterations(200000);
@@ -71,19 +71,29 @@ TEST_CASE("strategy mass equals opponent node visits at every thread count") {
     }
 }
 
-TEST_CASE("one thread is byte-identical to the serial reference") {
+TEST_CASE("two one-thread mccfr runs match every average strategy") {
     LeducGame game;
     ExternalSamplingSolver<LeducGame> single(game, 20260726);
     ExternalSamplingSolver<LeducGame> repeat(game, 20260726);
     single.run_iterations(5000, 1);
     repeat.run_iterations(5000, 1);
 
-    std::vector<double> a(4), b(4);
+    std::vector<std::size_t> action_counts(game.infoset_count(), 0);
+    walk(game, game.initial_state(), [&](const State& state) {
+        if (game.is_terminal(state) || game.is_chance(state)) return;
+        action_counts[game.infoset_index(state)] =
+            game.legal_actions(state).size();
+    });
+
     for (std::uint32_t index = 0; index < game.infoset_count(); ++index) {
-        single.average_strategy_into(index, 2, a);
-        repeat.average_strategy_into(index, 2, b);
-        REQUIRE(a[0] == b[0]);
-        REQUIRE(a[1] == b[1]);
+        std::size_t action_count = action_counts[index];
+        REQUIRE(action_count >= 2);
+        std::vector<double> a(action_count), b(action_count);
+        single.average_strategy_into(index, action_count, a);
+        repeat.average_strategy_into(index, action_count, b);
+        for (std::size_t i = 0; i < action_count; ++i) {
+            REQUIRE(a[i] == b[i]);
+        }
     }
 }
 

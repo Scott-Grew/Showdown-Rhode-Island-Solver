@@ -20,6 +20,7 @@ using cfr::abstraction::RihPartition;
 using cfr::grader::GsiStrategy;
 
 namespace {
+// Bijection between our class ids and the partition file (ids differ).
 void check(const GsiStrategy& strategy, std::size_t round) {
     static const RihPartition part = RihPartition::compute();
     std::vector<int> fwd(part.class_count(round), -1);
@@ -152,7 +153,7 @@ TEST_CASE("refined partition refines gameshrink and respects suits") {
         for (int author : ids) REQUIRE(author >= 0);
 }
 
-TEST_CASE("refined round 3 classes share opponent outcome multisets") {
+TEST_CASE("refined round-2 classes share opponent outcome multisets") {
     const RihPartition part = RihPartition::compute().refined();
     using Sig = std::vector<std::pair<std::uint16_t, std::uint8_t>>;
     std::vector<Sig> seen(part.class_count(2));

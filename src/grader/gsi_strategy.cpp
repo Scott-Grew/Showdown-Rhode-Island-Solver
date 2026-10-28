@@ -15,7 +15,11 @@ namespace cfr::grader {
 
 namespace {
 
-// Key ranges taken by rounds 1 and 2; later rounds start above.
+// GSI class ids: round 1 is 1 to 13, round 2 starts at 14 and
+// round 3 at 219.
+constexpr int kGsiRound2ClassIdBase = kGsiRound1ClassCount + 1;  // 14
+constexpr int kGsiRound3ClassIdBase =
+    kGsiRound2ClassIdBase + kGsiRound2ClassCount;  // 219
 constexpr int kGsiRound1KeySpan = kGsiRound1ClassCount * kGsiSlotsPerKey;
 constexpr int kGsiRound2KeySpan =
     kGsiRound2ClassCount * kGsiSequencesPerRound * kGsiSlotsPerKey;
@@ -25,7 +29,7 @@ constexpr int kGsiRound2KeySpan =
 constexpr int kHoleBoardPairCount = kCardCount * (kCardCount - 1);
 constexpr int kSignalLevel3Base = kCardCount + kHoleBoardPairCount;
 static_assert(kSignalLevel3Base + kHoleBoardPairCount * (kCardCount - 2) ==
-              kGsiSignalNodeCount);
+              kGsiOnePlayerSignalNodeCount);
 
 // A row whose slots sum to this or less is treated as absent.
 constexpr double kEmptyRowTotal = 1e-9;
@@ -87,8 +91,9 @@ struct GsiStrategy::PublicContext {
     game::Player acting_player = 0;
 };
 
-// Sequence ids are the closing codes stored when each board card
-// was dealt. decision_type is 0 with no bet faced, else the raise count.
+// sequence1/2 are our closing codes, used as GSI sequence ids; the
+// 0.805328 published exploitability pin depends on this encoding.
+// decision_type is 0 with no bet faced, else the raise count.
 GsiStrategy::PublicContext GsiStrategy::public_context(
     const game::State& state) {
     PublicContext context;
@@ -124,7 +129,7 @@ std::uint32_t GsiStrategy::key_for(const PublicContext& context,
             signal_index(hole, context.board0))];
         return static_cast<std::uint32_t>(
             kGsiSequencesPerRound * kGsiSlotsPerKey *
-                (class_id - kGsiRound1ClassCount - 1) +
+                (class_id - kGsiRound2ClassIdBase) +
             kGsiSlotsPerKey * context.sequence1 + kGsiRound1KeySpan + 1);
     }
 
@@ -132,7 +137,7 @@ std::uint32_t GsiStrategy::key_for(const PublicContext& context,
         signal_index(hole, context.board0, context.board1))];
     return static_cast<std::uint32_t>(
         kGsiSequencesPerRound * kGsiSequencesPerRound * kGsiSlotsPerKey *
-            (class_id - kGsiRound1ClassCount - kGsiRound2ClassCount - 1) +
+            (class_id - kGsiRound3ClassIdBase) +
         kGsiSlotsPerKey *
             (kGsiSequencesPerRound * context.sequence1 + context.sequence2) +
         kGsiRound1KeySpan + kGsiRound2KeySpan + 1);
@@ -168,8 +173,8 @@ void GsiStrategy::write_slots(game::Player acting_player, std::uint32_t key,
         destination[i] = 1.0 / static_cast<double>(action_count);
 }
 
-// Reads the partition in hole, board, board nesting order, then
-// both player files of key plus ten floats per row.
+// Partition file: nested in GSI suit-major card order (hole, then
+// each board card). Then both player files: key plus ten floats.
 GsiStrategy GsiStrategy::load(const std::string& directory) {
     GsiStrategy strategy;
 
@@ -188,7 +193,8 @@ GsiStrategy GsiStrategy::load(const std::string& directory) {
         }
         return static_cast<std::uint16_t>(class_id);
     };
-    strategy.signal_class_.assign(kGsiSignalNodeCount + 1, 0);
+    strategy.signal_class_.assign(kGsiOnePlayerSignalNodeCount + 1, 0);
+    // Root node 0 has 52 hole-card children (signal_index(hole) = 1 + hole).
     for (int hole = 0; hole < kCardCount; ++hole) {
         strategy.signal_class_[static_cast<std::size_t>(signal_index(hole))] =
             next_class();

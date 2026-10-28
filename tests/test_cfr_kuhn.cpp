@@ -14,6 +14,8 @@ using namespace cfr::solver;
 
 namespace {
 
+// Kuhn's analytic equilibrium family. Index 1 is bet when no bet is
+// faced; index 0 is call when one is.
 void check_kuhn_structure(const StrategyProfile& average) {
     double p0_jack_bet = average.at("P0:J:")[1];
     double p0_queen_bet = average.at("P0:Q:")[1];

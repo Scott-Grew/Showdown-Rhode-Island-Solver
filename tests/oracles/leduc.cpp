@@ -130,7 +130,8 @@ InfosetLabel LeducGame::infoset_label(const State& state) const {
     return label;
 }
 
-// Round 1 rows plus round 2 rows; infoset_index has the layout.
+// 288 = 6 * 3 + 5 * 6 * 3 * 3. Round 1 can end from every progress
+// value except the empty round, hence one fewer endings than values.
 std::uint32_t LeducGame::infoset_count() const {
     return static_cast<std::uint32_t>(
         kLeducRoundProgressCount * kLeducCardRankCount +

@@ -121,8 +121,9 @@ public:
     }
 
     // Binary checkpoint, native byte order: uint64 value count, int
-    // iteration count, then that many doubles (strategy sums only;
-    // regrets are not saved).
+    // iteration count, then that many doubles. Only strategy sums are
+    // saved, since grading reads the average strategy; without regrets
+    // a checkpoint cannot resume training.
     void save_strategy_sums(const std::string& path) const {
         std::ofstream output(path, std::ios::binary);
         if (!output)
@@ -316,6 +317,7 @@ private:
         [[maybe_unused]] double weighted_residual = 0.0;
         for (std::size_t i = 0; i < actions.size(); ++i) {
             weighted_residual += strategy[i] * (action_value[i] - node_value);
+            // Under external sampling every regret update has weight 1.
             accumulate<Concurrent>(cumulative_regrets_[table_offset + i],
                                    action_value[i] - node_value);
         }
