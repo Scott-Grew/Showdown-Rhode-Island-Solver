@@ -12,15 +12,7 @@
 
 namespace cfr::game {
 
-// Two-character card text such as "As" or "Tc".
-inline std::string rih_card_name(int card) {
-    static const char* const kRankNames[] = {"2", "3", "4", "5", "6", "7", "8",
-                                             "9", "T", "J", "Q", "K", "A"};
-    static const char* const kSuitNames[] = {"c", "d", "h", "s"};
-    Card typed_card = static_cast<Card>(card);
-    return std::string(kRankNames[card_rank(typed_card)]) +
-           kSuitNames[card_suit(typed_card)];
-}
+using cfr::rih_card_name;
 
 // "P<player>:<hole>|<board>:<r1>;<r2>;<r3>". Names stay finer than the
 // GameShrink index. Each round's text is fixed by its counters. The

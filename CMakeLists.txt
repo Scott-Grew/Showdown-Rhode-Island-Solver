@@ -60,6 +60,11 @@ add_executable(cfr_measure
 )
 target_link_libraries(cfr_measure PRIVATE cfr_solver cfr_grader)
 
+add_executable(cfr_play
+    src/play/play_rih.cpp
+)
+target_link_libraries(cfr_play PRIVATE cfr_solver cfr_grader)
+
 add_executable(cfr_tests
     tests/oracles/kuhn.cpp
     tests/oracles/leduc.cpp

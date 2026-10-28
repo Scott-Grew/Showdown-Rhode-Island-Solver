@@ -48,6 +48,7 @@ make bench      # speed
 make headline   # results table, ~30 min
 .build/release/cfr_measure --train 1600000 run.bin run.log 1 16
 .build/release/cfr_measure run.bin
+.build/release/cfr_play run.bin   # play against it; no argument plays the published strategy
 ```
 
 MIT license.
