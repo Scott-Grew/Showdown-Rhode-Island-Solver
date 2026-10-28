@@ -14,8 +14,8 @@ perfect):
 | Gilpin and Sandholm | 0.805 |
 | This project | 0.094 ± 0.001 |
 
-Ours: 5 seeds, 409.6M iterations, 332 ± 20 s on a 16-thread laptop. Training
-scales 10× from 1 to 16 threads (`make bench`).
+Ours: 5 seeds, 409.6M iterations, 332 ± 20 s of training on a 16-thread
+laptop. Training scales 10× from 1 to 16 threads (`make bench`).
 
 The game matches the paper's exact sizes: 6,632,705 deal nodes, 91,224,226 LP
 rows, 1,237,238 after GameShrink.
@@ -37,10 +37,14 @@ flowchart LR
 - **Best response** finds the strongest counter-strategy exactly, in one pass.
 
 Tests check against fixed answers: the paper's sizes, Kuhn poker's value
-(−1/18), and independent reference code. Clean under ASan, UBSan and TSan; CI
-on Clang and GCC.
+(−1/18), and independent reference code. Clean under ASan with UBSan
+(`make asan`) and TSan (`make tsan`). CI runs `make test` with Clang on macOS
+and GCC on Ubuntu.
 
 ## Build
+
+Needs CMake 3.20+, a C++20 compiler, curl and unzip. Catch2 is fetched when
+CMake configures.
 
 ```sh
 make test       # build, fetch the published strategy, run tests

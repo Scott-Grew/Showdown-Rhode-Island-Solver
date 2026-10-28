@@ -56,6 +56,8 @@ TEST_CASE("leduc: split pot pays 0 to both players") {
 }
 
 TEST_CASE("leduc: round 2 bet doubles round 1's size") {
+    // Player 0 holds a king, player 1 a jack, the board is a queen. Both
+    // check, then player 0 bets 4 in round 2 and is called: +1 ante +4.
     LeducGame game;
     State state = game.initial_state();
 

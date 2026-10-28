@@ -16,7 +16,8 @@ namespace cfr::grader {
 namespace {
 
 // GSI class ids: round 1 is 1 to 13, round 2 starts at 14 and
-// round 3 at 219.
+// round 3 at 219 (GSI numbers streets 1, 2, 3; board_count here is
+// 0, 1, 2 for hole, flop and turn).
 constexpr int kGsiRound2ClassIdBase = kGsiRound1ClassCount + 1;  // 14
 constexpr int kGsiRound3ClassIdBase =
     kGsiRound2ClassIdBase + kGsiRound2ClassCount;  // 219
@@ -56,7 +57,9 @@ int gsi_card(Card card) {
     return card_suit(card) * kRankCount + card_rank(card);
 }
 
-// Signal-tree node of a lone hole card; node 0 is the root.
+// Signal-tree node of a lone hole card; node 0 is the root. Level 1
+// covers GSI nodes 1..52, level 2 nodes 53..2704, level 3 nodes
+// 2705..135304.
 int signal_index(int hole) {
     return 1 + hole;
 }
@@ -91,17 +94,16 @@ struct GsiStrategy::PublicContext {
     game::Player acting_player = 0;
 };
 
-// sequence1/2 are our closing codes, used as GSI sequence ids; the
-// 0.805328 published exploitability pin depends on this encoding.
-// decision_type is 0 with no bet faced, else the raise count.
+// sequence1/2 are our closing codes (State::closing, listed at
+// closing_sequence), used directly as GSI sequence ids; the 0.805328
+// pin depends on that. At a decision a bet is faced exactly when
+// raises_used is above 0, so decision_type is the raise count.
 GsiStrategy::PublicContext GsiStrategy::public_context(
     const game::State& state) {
     PublicContext context;
     context.board_cards_dealt = state.board_count;
-    bool facing_bet =
-        state.round_len != 0 && game::last_action(state) == game::kActionRaise;
-    context.decision_type =
-        facing_bet ? static_cast<int>(state.raises_used) : 0;
+    assert(game::facing_bet(state) == (state.raises_used > 0));
+    context.decision_type = static_cast<int>(state.raises_used);
     context.acting_player = state.round_len % game::kPlayerCount;
     if (state.board_count >= 1) {
         context.board0 = gsi_card(static_cast<Card>(state.board_cards[0]));
@@ -114,8 +116,9 @@ GsiStrategy::PublicContext GsiStrategy::public_context(
     return context;
 }
 
-// Row key in a player file. Keys are 1-based, classes are numbered
-// across rounds, and each round's keys follow the previous one's.
+// Row key in a player file. Keys are 1-based indices of the first
+// float in the flat slot array for that row; slot order follows
+// round_legal_actions at each decision type.
 std::uint32_t GsiStrategy::key_for(const PublicContext& context,
                                    int hole) const {
     if (context.board_cards_dealt == 0) {
@@ -194,18 +197,21 @@ GsiStrategy GsiStrategy::load(const std::string& directory) {
         return static_cast<std::uint16_t>(class_id);
     };
     strategy.signal_class_.assign(kGsiOnePlayerSignalNodeCount + 1, 0);
-    // Root node 0 has 52 hole-card children (signal_index(hole) = 1 + hole).
-    for (int hole = 0; hole < kCardCount; ++hole) {
-        strategy.signal_class_[static_cast<std::size_t>(signal_index(hole))] =
+    // Partition lines follow GSI suit-major card order; loop ids are
+    // GSI card numbers before gsi_card converts our ids for lookups.
+    for (int gsi_hole = 0; gsi_hole < kCardCount; ++gsi_hole) {
+        strategy
+            .signal_class_[static_cast<std::size_t>(signal_index(gsi_hole))] =
             next_class();
-        for (int board0 = 0; board0 < kCardCount; ++board0) {
-            if (board0 == hole) continue;
+        for (int gsi_board0 = 0; gsi_board0 < kCardCount; ++gsi_board0) {
+            if (gsi_board0 == gsi_hole) continue;
             strategy.signal_class_[static_cast<std::size_t>(
-                signal_index(hole, board0))] = next_class();
-            for (int board1 = 0; board1 < kCardCount; ++board1) {
-                if (board1 == hole || board1 == board0) continue;
-                strategy.signal_class_[static_cast<std::size_t>(
-                    signal_index(hole, board0, board1))] = next_class();
+                signal_index(gsi_hole, gsi_board0))] = next_class();
+            for (int gsi_board1 = 0; gsi_board1 < kCardCount; ++gsi_board1) {
+                if (gsi_board1 == gsi_hole || gsi_board1 == gsi_board0)
+                    continue;
+                strategy.signal_class_[static_cast<std::size_t>(signal_index(
+                    gsi_hole, gsi_board0, gsi_board1))] = next_class();
             }
         }
     }

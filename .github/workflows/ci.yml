@@ -6,6 +6,7 @@ on:
 
 jobs:
   test:
+    # macos-latest builds with Apple Clang, ubuntu-latest with GCC.
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest]

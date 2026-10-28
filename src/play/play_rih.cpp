@@ -20,7 +20,7 @@ using namespace cfr::game;
 
 namespace {
 
-// Seats: the human acts first in every round.
+// The human is always seat 0, which is GSI player 1 (first to act).
 constexpr Player kHuman = 0;
 constexpr Player kSolver = 1;
 // The two hole cards are the first two entries of a hand's history.
@@ -28,18 +28,14 @@ constexpr int kHoleCardsDealt = 2;
 // Seed for a solver that only loads a checkpoint and never samples.
 constexpr std::uint64_t kCheckpointLoaderSeed = 1;
 
-bool facing_bet(const State& state, Player player) {
-    return state.round_contribution[player] < state.level_to_match;
-}
-
 // Word for an action: check and bet when no bet is faced, call and
 // raise otherwise.
-std::string action_word(Action action, const State& state, Player player) {
+std::string action_word(Action action, const State& state) {
+    const bool bet_faced = facing_bet(state);
     switch (action) {
         case kActionFold: return "fold";
-        case kActionCallCheck:
-            return facing_bet(state, player) ? "call" : "check";
-        case kActionRaise: return facing_bet(state, player) ? "raise" : "bet";
+        case kActionCallCheck: return bet_faced ? "call" : "check";
+        case kActionRaise: return bet_faced ? "raise" : "bet";
     }
     return "?";
 }
@@ -67,8 +63,7 @@ Action ask_human(const RhodeIslandGame& game, const State& state) {
     while (true) {
         std::cout << "  your move [";
         for (std::size_t i = 0; i < actions.size(); ++i)
-            std::cout << (i ? "/" : "")
-                      << action_word(actions[i], state, kHuman);
+            std::cout << (i ? "/" : "") << action_word(actions[i], state);
         std::cout << "]: " << std::flush;
 
         std::string typed;
@@ -77,7 +72,7 @@ Action ask_human(const RhodeIslandGame& game, const State& state) {
             typed.begin(), typed.end(), typed.begin(),
             [](unsigned char character) { return std::tolower(character); });
         for (Action action : actions) {
-            if (action_word(action, state, kHuman) == typed) return action;
+            if (action_word(action, state) == typed) return action;
         }
         std::cout << "  not a legal move here\n";
     }
@@ -87,7 +82,8 @@ Action ask_human(const RhodeIslandGame& game, const State& state) {
 using ActionProbabilities =
     std::function<std::vector<double>(const State&, std::size_t)>;
 
-// Samples the solver's action from its strategy at state.
+// Samples the solver's action from its strategy at state. The draw
+// matches ExternalSamplingSolver::sample_index, which is private.
 Action solver_move(const RhodeIslandGame& game, const State& state,
                    const ActionProbabilities& strategy,
                    std::mt19937_64& random_engine) {
@@ -130,7 +126,7 @@ std::optional<double> play_hand(const RhodeIslandGame& game,
             continue;
         }
         Action chosen = solver_move(game, state, strategy, random_engine);
-        std::cout << "  solver " << action_word(chosen, state, kSolver) << "\n";
+        std::cout << "  solver " << action_word(chosen, state) << "\n";
         state = game.apply_action(state, chosen);
     }
 

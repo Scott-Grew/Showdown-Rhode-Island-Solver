@@ -24,6 +24,7 @@ namespace cfr::grader {
 inline constexpr int kGsiOnePlayerSignalNodeCount = 135304;
 inline constexpr int kGsiRound1ClassCount = 13;
 inline constexpr int kGsiRound2ClassCount = 205;
+inline constexpr int kGsiRound3ClassCount = 1774;
 inline constexpr int kGsiSequencesPerRound = 7;
 inline constexpr int kGsiSlotsPerKey = 10;
 

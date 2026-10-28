@@ -36,7 +36,7 @@ SequenceFormSize rih_sequence_form_size(
     state = game.apply_action(state, kChanceCardOffset + make_card(1, 0));
     Action fixed_flop = kChanceCardOffset + make_card(2, 0);
     Action fixed_turn = kChanceCardOffset + make_card(3, 0);
-    // +1 is the empty sequence column/row in the sequence form.
+    // Each player's count starts at 1 for the empty sequence.
     SequenceFormSize totals{{0, 0}, {1, 1}};
     auto visit = [&](auto&& self, const State& node) -> void {
         if (game.is_terminal(node)) return;
@@ -103,6 +103,8 @@ struct SignalCount {
     int bad;
 };
 
+// One betting line (checks) reaches every deal prefix, because the
+// deals do not depend on the betting; only chance nodes are counted.
 SignalCount signal_tree(const RhodeIslandGame& game) {
     SignalCount tally{1, 0};
     State root = game.initial_state();
@@ -128,6 +130,22 @@ SignalCount signal_tree(const RhodeIslandGame& game) {
 
 using Actions = std::vector<Action>;
 
+int pack_hole_flop(int hole, int flop) {
+    return hole * 64 + flop;
+}
+void unpack_hole_flop(int packed, int& hole, int& flop) {
+    hole = packed / 64;
+    flop = packed % 64;
+}
+int pack_hole_flop_turn(int hole, int flop, int turn) {
+    return (hole * 64 + flop) * 64 + turn;
+}
+void unpack_hole_flop_turn(int packed, int& hole, int& flop, int& turn) {
+    hole = packed / 4096;
+    flop = packed / 64 % 64;
+    turn = packed % 64;
+}
+
 State play(const RhodeIslandGame& game, State state, const Actions& line,
            int card = -1) {
     for (Action action : line) state = game.apply_action(state, action);
@@ -144,7 +162,8 @@ State deal_two(const RhodeIslandGame& game, int first, int second) {
 TEST_CASE("RIH unabstracted sequence-form size matches the paper") {
     // Gilpin & Sandholm, J. ACM 2007, p. 25:4.
     SequenceFormSize size = rih_sequence_form_size({52, 52 * 51, 52 * 51 * 50});
-    // +1 is the empty sequence in the matrix layout.
+    // Player 0 sequences + player 1 infosets + empty sequence = rows;
+    // the symmetric player-1 sequences + player-0 infosets = columns.
     long long rows = size.sequences[0] + size.infosets[1] + 1;
     long long columns = size.sequences[1] + size.infosets[0] + 1;
     for (std::size_t player = 0; player < 2; ++player) {
@@ -216,6 +235,7 @@ TEST_CASE("rhode island chance sample matches the cumulative draw") {
 
 TEST_CASE(
     "rhode island: a round 1 fold pays the raiser the folder's contribution") {
+    // board_count 0 is the first betting round (GSI street 1).
     RhodeIslandGame game;
     State state = play(game, deal_two(game, 0, 4),
                        {kActionCallCheck, kActionRaise, kActionFold});
@@ -436,7 +456,8 @@ std::pair<std::vector<Actions>, std::vector<Actions>> round_lines(
 }
 // Plays every closed line through each earlier round, then every open
 // line. An even-length line leaves seat 0 to act, so it is played from
-// the deal that gives hole to seat 0.
+// the deal that gives hole to seat 0. Example: hole 2, flop 0, turn 1
+// runs closed lines on both seat orderings before each open line.
 template <class Fn>
 void cross(const RhodeIslandGame& game, const std::vector<Actions>& open,
            const std::vector<Actions>& closed, int hole, int flop, int turn,
@@ -479,11 +500,11 @@ TEST_CASE("rhode island gameshrink index hits every row once") {
         int hole = i / (deck * deck), flop = i / deck % deck, turn = i % deck;
         if (rep0[cls(partition, hole)] < 0) rep0[cls(partition, hole)] = hole;
         if (flop != hole && rep1[cls(partition, hole, flop)] < 0)
-            rep1[cls(partition, hole, flop)] = hole * 64 + flop;
+            rep1[cls(partition, hole, flop)] = pack_hole_flop(hole, flop);
         if (flop != hole && turn != hole && turn != flop &&
             rep2[cls(partition, hole, flop, turn)] < 0)
             rep2[cls(partition, hole, flop, turn)] =
-                (hole * 64 + flop) * 64 + turn;
+                pack_hole_flop_turn(hole, flop, turn);
     }
     std::vector<int> seen(game.infoset_count(), 0);
     int bad = 0;
@@ -493,11 +514,16 @@ TEST_CASE("rhode island gameshrink index hits every row once") {
         if (index < seen.size() && seen[index] == 0) seen[index] = 1;
     };
     for (int hole : rep0) cross(game, open, closed, hole, -1, -1, mark);
-    for (int packed : rep1)
-        cross(game, open, closed, packed / 64, packed % 64, -1, mark);
-    for (int packed : rep2)
-        cross(game, open, closed, packed / 4096, packed / 64 % 64, packed % 64,
-              mark);
+    for (int packed : rep1) {
+        int hole = 0, flop = 0;
+        unpack_hole_flop(packed, hole, flop);
+        cross(game, open, closed, hole, flop, -1, mark);
+    }
+    for (int packed : rep2) {
+        int hole = 0, flop = 0, turn = 0;
+        unpack_hole_flop_turn(packed, hole, flop, turn);
+        cross(game, open, closed, hole, flop, turn, mark);
+    }
     REQUIRE(bad == 0);
     REQUIRE(std::count(seen.begin(), seen.end(), 1) ==
             std::ptrdiff_t(seen.size()));
@@ -521,6 +547,8 @@ TEST_CASE("rhode island infoset index matches player round betting and class") {
                 cls(partition, hole,
                     state.board_count >= 1 ? state.board_cards[0] : -1,
                     state.board_count >= 2 ? state.board_cards[1] : -1);
+            // Key bytes: acting player, board_count, class id (16-bit LE),
+            // then each betting action in history.
             std::string key{static_cast<char>(player),
                             static_cast<char>(state.board_count),
                             static_cast<char>(id), static_cast<char>(id >> 8)};

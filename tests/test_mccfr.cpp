@@ -97,7 +97,7 @@ TEST_CASE("two one-thread mccfr runs match every average strategy") {
     }
 }
 
-TEST_CASE("per-thread streams are distinct") {
+TEST_CASE("scrambled_seed gives distinct streams per thread index") {
     REQUIRE(cfr::solver::scrambled_seed(20260726, 0) == 20260726);
     std::set<std::uint64_t> seen;
     for (std::size_t index = 0; index < 16; ++index) {

@@ -29,7 +29,8 @@ class RhodeIslandGame {
 public:
     static constexpr std::size_t kMaxActions = 3;
 
-    // Binds the process-lifetime GameShrink partition.
+    // The first construction builds the refined partition (the
+    // labelling fixed point); every game then shares it for the process.
     RhodeIslandGame();
     State initial_state() const;
     bool is_terminal(const State& state) const;
@@ -48,7 +49,8 @@ public:
     Action sample_chance_action(const State& state, double roll) const {
         return sample_undealt_card(state, kCardCount, roll);
     }
-    // Writes the hole card and the class infoset_index reads, together.
+    // Sets the hole card and card_class for infoset_index probes; it
+    // does not append to history.
     void set_hole_card(State& state, Player player, int card) const;
 
 private:

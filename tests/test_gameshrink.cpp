@@ -57,12 +57,12 @@ void check(const GsiStrategy& strategy, std::size_t round) {
 
 }
 
-TEST_CASE("partition class counts match the published integers") {
+TEST_CASE("authors' GameShrink counts and refined counts match published") {
     const RihPartition authors = RihPartition::compute();
     const RihPartition refined = authors.refined();
     REQUIRE(authors.class_count(0) == 13);
     REQUIRE(authors.class_count(1) == 205);
-    REQUIRE(authors.class_count(2) == 1774);
+    REQUIRE(authors.class_count(2) == cfr::grader::kGsiRound3ClassCount);
     REQUIRE(refined.class_count(0) == 13);
     REQUIRE(refined.class_count(1) == 325);
     REQUIRE(refined.class_count(2) == 7969);

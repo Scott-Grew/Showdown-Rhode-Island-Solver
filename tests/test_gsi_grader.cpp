@@ -24,9 +24,8 @@ cfr::solver::RihStrategyQuery player0_bets_only_in_round(int target_round) {
         probabilities.assign(
             static_cast<std::size_t>(cfr::kCardCount) * action_count, 0.0);
 
-        bool facing_bet =
-            state.round_len != 0 && last_action(state) == kActionRaise;
-        std::size_t choice = !facing_bet && acting_player == 0 &&
+        bool bet_faced = facing_bet(state);
+        std::size_t choice = !bet_faced && acting_player == 0 &&
                                      state.board_count == target_round
                                  ? 1
                                  : 0;
@@ -39,10 +38,11 @@ cfr::solver::RihStrategyQuery player0_bets_only_in_round(int target_round) {
 
 }
 
-// Round 0, 1 and 2 are before the flop, the turn and the showdown.
-// Player 0 bets (index 1) only in that round; player 1 folds to it.
+// Round index 0, 1 and 2 are before the flop, the turn and showdown
+// (GSI streets 1, 2 and 3). Player 0 bets only in that round; player 1
+// folds, winning one ante.
 TEST_CASE(
-    "a fold before the board is dealt wins the opponent ante in each round") {
+    "gsi grader: player 0 bets and player 1 folds for one ante each round") {
     for (int round = 0; round < 3; ++round) {
         cfr::solver::RihStrategyQuery profile =
             player0_bets_only_in_round(round);

@@ -39,7 +39,10 @@ constexpr int closing_sequence_count(int max_raises) {
 }
 
 // Opened with a check, the id is the raise count. Opened with a bet,
-// the id is max_raises above that.
+// the id is max_raises above that. With three raises allowed the ids
+// are 0 check-check, 1 check-bet-call, 2 check-bet-raise-call,
+// 3 check-bet-raise-raise-call, 4 bet-call, 5 bet-raise-call and
+// 6 bet-raise-raise-call.
 inline int closing_sequence(int raises, bool opened_with_check,
                             int max_raises) {
     return opened_with_check ? raises : raises + max_raises;
@@ -50,8 +53,14 @@ inline Action last_action(const State& state) {
     return state.history[static_cast<std::size_t>(state.history_len) - 1];
 }
 
+// Kuhn's own 0 is check; Kuhn never calls this.
 inline bool folded(const State& state) {
     return state.round_len != 0 && last_action(state) == kActionFold;
+}
+
+// The player to act faces a bet: the round's last action is a raise.
+inline bool facing_bet(const State& state) {
+    return state.round_len != 0 && last_action(state) == kActionRaise;
 }
 
 // A lone opening check leaves the round open.
@@ -82,9 +91,7 @@ inline int round_progress(const State& state) {
 template <std::size_t N>
 inline FixedVector<Action, N> round_legal_actions(const State& state,
                                                   int max_raises) {
-    bool facing_bet =
-        state.round_len != 0 && last_action(state) == kActionRaise;
-    if (!facing_bet) return {kActionCallCheck, kActionRaise};
+    if (!facing_bet(state)) return {kActionCallCheck, kActionRaise};
     if (state.raises_used < max_raises)
         return {kActionFold, kActionCallCheck, kActionRaise};
     return {kActionFold, kActionCallCheck};
@@ -124,8 +131,8 @@ inline void begin_next_betting_round(State& state) {
 
 // A board card stores the closing-sequence code before the round
 // counters reset. max_raises is the cap of the round being closed;
-// a hole-card deal ignores it. The dealt card is already history's
-// last entry.
+// a hole-card deal ignores it. Call only after append_action has
+// recorded the chance entry as history's last element.
 inline void deal_and_advance(State& state, int card, int max_raises) {
     bool board_card = state.hole_cards[0] != -1 && state.hole_cards[1] != -1;
     if (board_card) {

@@ -34,7 +34,8 @@ constexpr std::size_t triple_index(int hole, int flop, int turn) {
 }
 
 // find before insert: a round-3 key holds 49 opponent entries, and
-// emplace would copy it on every one of the 132k hands.
+// emplace would copy it on every one of the 132k hands. The id is the
+// next integer at insertion, so the map's key order does not matter.
 template <typename Key>
 std::uint16_t intern(std::map<Key, std::uint16_t>& ids, const Key& key,
                      std::uint16_t& next_id) {
@@ -95,11 +96,12 @@ std::uint16_t intern_bag(std::map<Bag<N>, std::uint16_t>& ids,
 
 }
 
-// Round 2's (turn) key is the current class plus the sorted (opponent
-// class, or 0 under the authors' rule; loss/tie/win) pair per opponent
-// card. Rounds 1 and 0 key on the current class plus the sorted ids of
-// their children. Final round 1 and 2 ids pair the parent's new class
-// with that bottom-up id, so no class spans two parents.
+// Round 2 (turn; GSI street 3) keys on the current class plus the
+// sorted (opponent class, or 0 under the authors' rule; loss/tie/win)
+// pair per opponent card. Rounds 1 (flop) and 0 (hole; GSI streets 2
+// and 1) key on the current class plus the sorted ids of their
+// children. Final round 1 and 2 ids pair the parent's new class with
+// that bottom-up id, so no class spans two parents.
 RihPartition RihPartition::label(std::span<const std::uint16_t> showdown_rank,
                                  bool opponent_labels) const {
     using Leaf = std::pair<std::uint16_t, std::uint8_t>;

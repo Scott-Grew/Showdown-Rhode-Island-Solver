@@ -113,6 +113,7 @@ double KuhnGame::player0_utility(const State& state) {
         if (betting[0] == kKuhnActionBet && betting[1] == kKuhnActionCall) {
             return player0_has_higher_card ? 2.0 : -2.0;
         }
+        // bet then fold: player 0 wins the one-chip ante.
         return 1.0;
     }
 
@@ -153,6 +154,7 @@ std::uint32_t KuhnGame::infoset_count() const {
 std::uint32_t KuhnGame::infoset_index(const State& state) const {
     Player acting_player = current_player(state);
     auto betting = betting_history(state);
+    // progress encodes the betting line, which fixes the seat to act.
     int progress = betting_progress(betting);
     return static_cast<std::uint32_t>(progress * kKuhnDeckSize +
                                       state.hole_cards[acting_player]);

@@ -22,11 +22,11 @@ constexpr Player opponent(Player player) {
     return kPlayerCount - 1 - player;
 }
 
-// Fixed capacities of the State arrays below. A betting round holds
-// at most eight actions, and every game here deals from at most 52
-// cards. History is 26 rather than 30 so each player's stored class
-// fits and State stays within 64 bytes. The longest hand is 19
-// entries.
+// Fixed capacities of the State arrays below. A Rhode Island round
+// has at most five actions (check, bet, raise, raise, call); eight is
+// storage slack. Every game here deals from at most 52 cards. History
+// holds 26 entries, above the longest hand's 19, and small enough that
+// State with card_class stays within 64 bytes.
 inline constexpr std::size_t kMaxHistory = 26;
 inline constexpr std::size_t kMaxBoardCards = 2;
 inline constexpr std::size_t kMaxActionsPerRound = 8;
@@ -71,10 +71,11 @@ private:
 // The fields after history are the betting round in progress.
 // Leduc and Rhode Island update them in O(1) from apply_action;
 // Kuhn leaves them at the defaults. The active round's actions
-// are history's last round_len entries. contribution includes
-// the ante. showdown_rank is filled when Rhode Island deals the
-// turn. round_contribution is each seat's chips this round, and
-// level_to_match the amount the next call must reach. closing[r]
+// are history's last round_len entries. contribution includes the
+// ante; Leduc and Rhode Island post bets there, while Kuhn settles
+// from the betting line alone. showdown_rank is filled when Rhode
+// Island deals the turn. round_contribution is each seat's chips this
+// round, and level_to_match the amount the next call must reach. closing[r]
 // is the closing-sequence code of completed round r, written when
 // that round's board card is dealt.
 struct State {
@@ -126,8 +127,9 @@ concept GameLike = requires(const CandidateGame game, const State state,
         game.chance_outcomes(state)
     } -> std::same_as<FixedVector<ChanceOutcome, kMaxChanceOutcomes>>;
     { CandidateGame::kMaxActions } -> std::convertible_to<std::size_t>;
-    // A game may also define sample_chance_action(state, roll), which
-    // the sampling solver uses in place of summing chance_outcomes.
+    // A game may also define sample_chance_action(state, roll); the
+    // solver detects that hook with requires and uses it instead of
+    // summing chance_outcomes.
 };
 
 }

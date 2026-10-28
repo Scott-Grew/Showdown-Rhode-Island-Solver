@@ -70,20 +70,20 @@ NaiveRank naive_evaluate_3card(const Card* cards) {
         result.tiebreak[i] = hand.count_rank_pairs[i].second;
 
     if (hand.is_straight && hand.is_flush) {
-        result.category = 5;
+        result.category = kStraightFlush;
         result.tiebreak = {hand.straight_high, -1, -1};
     } else if (hand.count_rank_pairs[0].first == 3) {
-        result.category = 4;
+        result.category = kThreeOfAKind;
         result.tiebreak = {hand.count_rank_pairs[0].second, -1, -1};
     } else if (hand.is_straight) {
-        result.category = 3;
+        result.category = kStraight;
         result.tiebreak = {hand.straight_high, -1, -1};
     } else if (hand.is_flush) {
-        result.category = 2;
+        result.category = kFlush;
     } else if (hand.count_rank_pairs[0].first == 2) {
-        result.category = 1;
+        result.category = kPair;
     } else {
-        result.category = 0;
+        result.category = kHighCard;
     }
     return result;
 }

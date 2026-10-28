@@ -30,7 +30,8 @@ State facing_opening_raise(int hole_rank, int hole_suit) {
     return game.apply_action(state, kActionRaise);
 }
 
-// Gilpin and Sandholm's published round-one fold frequencies.
+// Gilpin and Sandholm's published round-one fold frequencies; the
+// values are taken from the file and are not monotone in rank.
 constexpr double kGilpinSandholmRound1FoldFrequency[cfr::kRankCount] = {
     1.0,         0.996309531, 0.985427557, 0.951675343, 0.777605156,
     0.576978827, 0.731294,    0.563508,    0.171509,    0.0,

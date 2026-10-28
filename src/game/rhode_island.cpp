@@ -167,7 +167,7 @@ double RhodeIslandGame::terminal_utility(const State& state,
 //   round 1 | S * P * C1
 //   round 2 | S * S * P * C2
 //
-// With the refined class counts this is 3,142,152.
+// With the refined class counts 13, 325 and 7,969 this is 3,142,152.
 std::uint32_t RhodeIslandGame::infoset_count() const {
     constexpr std::uint32_t kProgress =
         static_cast<std::uint32_t>(kRihRoundProgressCount);

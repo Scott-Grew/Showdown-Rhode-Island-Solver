@@ -17,8 +17,8 @@ TEST_CASE("decision nodes have a legal action") {
     LeducGame leduc;
     require_decisions_actionable(leduc, leduc.initial_state());
 
-    // One fixed deal. Betting does not depend on the cards, which is
-    // why the sequence-form integer 91,224,226 pins that topology.
+    // One fixed deal pins betting topology; see test_rhode_island
+    // "RIH unabstracted sequence-form size matches the paper" for 91,224,226.
     RhodeIslandGame rhode;
     State dealt = rhode.initial_state();
     dealt = rhode.apply_action(dealt, kChanceCardOffset + cfr::make_card(0, 0));
@@ -44,8 +44,7 @@ TEST_CASE("kuhn showdown and fold pay the analytic amounts") {
         Action answer;
         double utility0;
     };
-    // J bets into K and calls: the caller loses the 2-chip pot.
-    // A bet that folds wins the 1-chip ante.
+    // J bets, K calls, J nets −2. Q bets, K folds, Q nets +1.
     Line lines[] = {
         {kKuhnJack, kKuhnKing, kKuhnActionBet, kKuhnActionCall, -2.0},
         {kKuhnQueen, kKuhnKing, kKuhnActionBet, kKuhnActionFold, 1.0},

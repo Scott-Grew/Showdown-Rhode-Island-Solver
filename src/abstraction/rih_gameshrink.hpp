@@ -18,6 +18,8 @@
 namespace cfr::abstraction {
 
 // Authors' GameShrink partition, and the lossless refinement of it.
+// Class ids are a dense numbering in traversal order, not the ids in
+// the published partition file.
 class RihPartition {
 public:
     static RihPartition compute();

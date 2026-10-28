@@ -35,8 +35,9 @@ double rih_best_response_value(const RihStrategyQuery& opponent_strategy,
 // Expected chips per hand for player when both seats play profile.
 double rih_strategy_value(const RihStrategyQuery& profile, game::Player player);
 
-// As rih_best_response_value, but the responder may deviate
-// only in the round with this many board cards dealt.
+// As rih_best_response_value, but the responder may deviate only in
+// the round with this many board cards dealt (0 hole, 1 flop, 2 turn;
+// GSI and the paper number those streets 1, 2 and 3).
 double rih_best_response_value_in_round(
     const RihStrategyQuery& opponent_strategy, game::Player responder,
     int round);
@@ -66,33 +67,24 @@ template <typename AverageStrategySource, typename GameT>
     requires game::GameLike<GameT>
 RihStrategyQuery rih_average_strategy_query(const AverageStrategySource& source,
                                             const GameT& game) {
-    return [&source, &game](const game::State& state,
-                            game::Player acting_player,
-                            std::vector<double>& probabilities_by_card) {
-        std::size_t action_count = game.legal_actions(state).size();
-        probabilities_by_card.assign(
-            static_cast<std::size_t>(kCardCount) * action_count, 0.0);
+    return
+        [&source, &game](const game::State& state, game::Player acting_player,
+                         std::vector<double>& probabilities_by_card) {
+            std::size_t action_count = game.legal_actions(state).size();
+            probabilities_by_card.assign(
+                static_cast<std::size_t>(kCardCount) * action_count, 0.0);
 
-        game::State probe = state;
-        for (int card = 0; card < kCardCount; ++card) {
-            // Rhode Island's infoset_index reads the cached card_class,
-            // so it needs set_hole_card; Kuhn and Leduc patch hole_cards.
-            if constexpr (requires {
-                              game.set_hole_card(probe, acting_player, card);
-                          }) {
+            game::State probe = state;
+            for (int card = 0; card < kCardCount; ++card) {
                 game.set_hole_card(probe, acting_player, card);
-            } else {
-                probe.hole_cards[acting_player] =
-                    static_cast<std::int8_t>(card);
+                source.average_strategy_into(
+                    game.infoset_index(probe), action_count,
+                    std::span<double>(
+                        probabilities_by_card.data() +
+                            static_cast<std::size_t>(card) * action_count,
+                        action_count));
             }
-            source.average_strategy_into(
-                game.infoset_index(probe), action_count,
-                std::span<double>(
-                    probabilities_by_card.data() +
-                        static_cast<std::size_t>(card) * action_count,
-                    action_count));
-        }
-    };
+        };
 }
 
 }

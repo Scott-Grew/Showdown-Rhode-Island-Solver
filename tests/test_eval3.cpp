@@ -24,6 +24,8 @@ using cfr::eval::naive::naive_evaluate_3card;
 using cfr::eval::naive::NaiveRank;
 
 TEST_CASE("RIH eval3 ranks categories in three-card poker order") {
+    // Strongest first: straight flush, three of a kind, straight, flush,
+    // pair, high card.
     std::array<std::array<Card, 3>, 6> hands = {{
         {make_card(3, 0), make_card(4, 0), make_card(5, 0)},
         {make_card(5, 0), make_card(5, 1), make_card(5, 2)},
@@ -46,9 +48,12 @@ TEST_CASE("RIH eval3 wheel: A-2-3 is the lowest straight, Q-K-A the highest") {
     std::array<Card, 3> broadway = {make_card(10, 0), make_card(11, 1),
                                     make_card(12, 2)};
 
-    REQUIRE(naive_evaluate_3card(wheel.data()).category == 3);
-    REQUIRE(naive_evaluate_3card(two_three_four.data()).category == 3);
-    REQUIRE(naive_evaluate_3card(broadway.data()).category == 3);
+    REQUIRE(naive_evaluate_3card(wheel.data()).category ==
+            cfr::eval::naive::kStraight);
+    REQUIRE(naive_evaluate_3card(two_three_four.data()).category ==
+            cfr::eval::naive::kStraight);
+    REQUIRE(naive_evaluate_3card(broadway.data()).category ==
+            cfr::eval::naive::kStraight);
 
     REQUIRE(evaluate_3card(wheel.data()) <
             evaluate_3card(two_three_four.data()));

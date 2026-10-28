@@ -9,6 +9,14 @@
 
 namespace cfr::eval::naive {
 
+// Categories, weakest first, as eval3 orders them.
+constexpr int kHighCard = 0;
+constexpr int kPair = 1;
+constexpr int kFlush = 2;
+constexpr int kStraight = 3;
+constexpr int kThreeOfAKind = 4;
+constexpr int kStraightFlush = 5;
+
 struct NaiveRank {
     int category = 0;
     std::array<int, 3> tiebreak = {-1, -1, -1};
